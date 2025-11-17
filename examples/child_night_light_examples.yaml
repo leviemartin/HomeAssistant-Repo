@@ -1,0 +1,683 @@
+# Child Night Light Blueprint - Example Configurations
+#
+# This file contains real-world example configurations for the Child-Friendly
+# Night Light Automation blueprint. Copy and adapt these examples to match
+# your specific needs.
+#
+# Each example includes:
+# - Target age range
+# - Use case scenario
+# - Complete configuration
+# - Expected behavior
+# - Rationale for settings
+
+# ==============================================================================
+# EXAMPLE 1: Basic Nursery Night Light (Ages 0-12 months)
+# ==============================================================================
+#
+# Use Case:
+#   Simple night light for infant nursery. Very low brightness to protect
+#   infant's highly sensitive circadian rhythm. No motion sensor to avoid
+#   disturbances from normal infant movement.
+#
+# Configuration:
+alias: "Nursery Night Light - Basic Infant"
+description: Ultra-low brightness amber night light for newborn/infant
+use_blueprint:
+  path: child_night_light.yaml
+  input:
+    # Lights
+    target_lights:
+      entity_id: light.nursery_lamp
+
+    # Brightness & Color
+    base_brightness: 2  # Ultra-low for infant sensitivity
+    color_temperature: 2000  # Warm amber
+
+    # Nighttime Schedule
+    nighttime_enabled: true
+    nighttime_start: "18:30:00"  # 6:30 PM bedtime
+    nighttime_end: "06:30:00"    # 6:30 AM wake time
+
+    # Nap Schedules (adjust to your infant's schedule)
+    nap1_enabled: true
+    nap1_start: "09:00:00"  # Morning nap
+    nap1_end: "11:00:00"
+
+    nap2_enabled: true
+    nap2_start: "13:00:00"  # Afternoon nap
+    nap2_end: "15:00:00"
+
+    # No motion sensor (avoid triggering from normal infant movement)
+    motion_sensor: {}
+
+    # Gentle transitions
+    transition_duration: 5
+#
+# Expected Behavior:
+#   - Lights turn on automatically at 6:30 PM with barely visible amber glow
+#   - Same lighting during both nap times
+#   - Lights turn off at 6:30 AM
+#   - No motion-based changes
+#
+# Rationale:
+#   - 2% brightness is lowest safe level, protecting infant melatonin
+#   - 2000K provides minimal circadian disruption (research-backed)
+#   - No motion sensor prevents false triggers from sleeping baby
+#   - Two nap periods typical for this age range
+
+---
+
+# ==============================================================================
+# EXAMPLE 2: Nursery with Motion Sensor for Parent Checks (Ages 0-18 months)
+# ==============================================================================
+#
+# Use Case:
+#   Nursery night light that's normally very dim but increases brightness when
+#   parent enters to check on baby, change diaper, or feed. Motion sensor
+#   positioned to only detect adult movement, not baby in crib.
+#
+# Configuration:
+alias: "Nursery Night Light - Motion Assisted"
+description: Low brightness with motion boost for parent nighttime checks
+use_blueprint:
+  path: child_night_light.yaml
+  input:
+    # Lights (multiple for better coverage)
+    target_lights:
+      entity_id:
+        - light.nursery_ceiling
+        - light.nursery_lamp
+
+    # Brightness & Color
+    base_brightness: 2  # Very low baseline
+    color_temperature: 2000  # Warm amber
+
+    # Nighttime Schedule
+    nighttime_enabled: true
+    nighttime_start: "19:00:00"  # 7:00 PM
+    nighttime_end: "07:00:00"    # 7:00 AM
+
+    # Nap Schedules
+    nap1_enabled: true
+    nap1_start: "09:30:00"
+    nap1_end: "11:00:00"
+
+    nap2_enabled: true
+    nap2_start: "13:30:00"
+    nap2_end: "15:30:00"
+
+    # Motion Sensor Settings
+    motion_sensor: binary_sensor.nursery_motion
+    motion_brightness_boost: 12  # Enough to see clearly for diaper changes
+    motion_boost_duration: 90    # 90 seconds for typical parent check
+
+    # Smooth transitions
+    transition_duration: 4
+#
+# Expected Behavior:
+#   - Normal state: Very dim amber glow (2%)
+#   - When parent enters: Brightness increases to 12% (still dim, but functional)
+#   - After 90 seconds of no motion: Returns to 2%
+#   - Color remains warm amber throughout
+#
+# Rationale:
+#   - Base 2% doesn't disturb sleeping baby
+#   - 12% boost provides functional light for diaper changes/feeding
+#   - 90 second duration covers typical check-in time
+#   - Motion sensor must be positioned to avoid triggering from crib movement
+#
+# Motion Sensor Placement Tips:
+#   - Mount sensor aiming at doorway/entrance
+#   - Angle away from crib to avoid detecting baby movement
+#   - Test positioning during day to ensure it only triggers when adult enters
+
+---
+
+# ==============================================================================
+# EXAMPLE 3: Toddler Bedroom with Bathroom Path (Ages 2-4 years)
+# ==============================================================================
+#
+# Use Case:
+#   Recently potty-trained toddler needs safe pathway from bedroom to bathroom.
+#   Multiple lights create a lighted path. Motion sensor in hallway triggers
+#   brightness boost for safe navigation.
+#
+# Configuration:
+alias: "Toddler Bedroom & Bathroom Path"
+description: Multi-room night lighting with motion-triggered pathway
+use_blueprint:
+  path: child_night_light.yaml
+  input:
+    # Multiple lights along path
+    target_lights:
+      entity_id:
+        - light.bedroom_night_light
+        - light.hallway_light
+        - light.bathroom_vanity
+
+    # Brightness & Color
+    base_brightness: 3  # Safe low level
+    color_temperature: 2000  # Warm amber
+
+    # Nighttime Only (no naps at this age)
+    nighttime_enabled: true
+    nighttime_start: "19:30:00"  # 7:30 PM bedtime
+    nighttime_end: "07:00:00"    # 7:00 AM wake time
+
+    # Naps disabled
+    nap1_enabled: false
+    nap2_enabled: false
+
+    # Motion Sensor Settings
+    motion_sensor: binary_sensor.hallway_motion
+    motion_brightness_boost: 15  # Higher for safe walking
+    motion_boost_duration: 120   # 2 minutes for bathroom trip
+
+    # Smooth transitions
+    transition_duration: 4
+#
+# Expected Behavior:
+#   - All lights (bedroom, hallway, bathroom) glow dimly at 3% from 7:30 PM
+#   - When toddler gets up: Hallway motion sensor detects movement
+#   - All lights brighten to 15% for safe navigation
+#   - After bathroom trip (2 minutes no motion): Return to 3%
+#   - Lights turn off at 7:00 AM wake time
+#
+# Rationale:
+#   - 3% base provides enough light to safely navigate when boosted
+#   - 15% boost is bright enough for safe walking but won't fully wake child
+#   - 2 minute duration covers typical bathroom trip
+#   - All lights on same automation ensures consistent path lighting
+#
+# Alternative Approach:
+#   You could create TWO separate automations:
+#   - Bedroom light: 2% base, 8% boost (very low)
+#   - Hallway/bathroom: 5% base, 20% boost (brighter for safety)
+
+---
+
+# ==============================================================================
+# EXAMPLE 4: Preschooler Transitioning from Night Light (Ages 4-5 years)
+# ==============================================================================
+#
+# Use Case:
+#   Child is ready to learn sleeping without night light, but still needs
+#   comfort/safety. This configuration gradually reduces dependency by only
+#   keeping light on for first part of night and having motion-only backup.
+#
+# Configuration:
+alias: "Preschooler - Gradual Night Light Reduction"
+description: Light turns off mid-night to encourage darkness tolerance
+use_blueprint:
+  path: child_night_light.yaml
+  input:
+    # Single small light
+    target_lights:
+      entity_id: light.bedroom_small_lamp
+
+    # Lower brightness (child is older, less sensitive)
+    base_brightness: 4
+    color_temperature: 2200  # Slightly less strict than younger ages
+
+    # Nighttime - ENDS AT MIDNIGHT (turns off mid-sleep)
+    nighttime_enabled: true
+    nighttime_start: "20:00:00"  # 8:00 PM bedtime
+    nighttime_end: "00:00:00"    # Midnight (light turns off)
+
+    # No naps
+    nap1_enabled: false
+    nap2_enabled: false
+
+    # Motion sensor provides backup if child wakes
+    motion_sensor: binary_sensor.bedroom_motion
+    motion_brightness_boost: 10
+    motion_boost_duration: 60
+
+    # Gentle transitions
+    transition_duration: 5
+#
+# Expected Behavior:
+#   - Light turns on at 8 PM bedtime with gentle amber glow
+#   - Child falls asleep with comforting light
+#   - At midnight, light turns off (child already asleep, won't notice)
+#   - If child wakes after midnight and moves, light briefly activates
+#   - Gradually teaches tolerance of sleeping in darkness
+#
+# Rationale:
+#   - Light during falling-asleep period provides comfort
+#   - Turning off at midnight means child sleeps most of night in darkness
+#   - Motion sensor provides safety backup if actually needed
+#   - Prepares child for full darkness sleeping
+#
+# Gradual Reduction Schedule (over 8-12 weeks):
+#   Week 1-2: End time 00:00 (midnight)
+#   Week 3-4: End time 23:00 (11 PM)
+#   Week 5-6: End time 22:00 (10 PM)
+#   Week 7-8: End time 21:00 (9 PM - 1 hour after bedtime)
+#   Week 9+: Disable scheduled activation, motion-only
+
+---
+
+# ==============================================================================
+# EXAMPLE 5: Multiple Children Sharing Room (Ages 2-5 years)
+# ==============================================================================
+#
+# Use Case:
+#   Siblings with different bedtimes sharing a room. Automation must handle
+#   overlapping schedules without turning lights off between bedtimes.
+#
+# Configuration:
+alias: "Shared Bedroom - Staggered Bedtimes"
+description: Night light for room with two children, different schedules
+use_blueprint:
+  path: child_night_light.yaml
+  input:
+    # Room lighting
+    target_lights:
+      entity_id:
+        - light.shared_bedroom_lamp_1
+        - light.shared_bedroom_lamp_2
+
+    # Brightness & Color
+    base_brightness: 3
+    color_temperature: 2000
+
+    # Nighttime - EARLIEST bedtime to LATEST wake time
+    nighttime_enabled: true
+    nighttime_start: "19:00:00"  # When first child goes to bed
+    nighttime_end: "07:30:00"    # When last child wakes up
+
+    # Nap - Overlapping nap times
+    nap1_enabled: true
+    nap1_start: "13:00:00"  # When first child naps
+    nap1_end: "15:30:00"    # When last child finishes nap
+
+    nap2_enabled: false  # Only one nap at these ages
+
+    # Motion sensor for any child's movement
+    motion_sensor: binary_sensor.shared_bedroom_motion
+    motion_brightness_boost: 12
+    motion_boost_duration: 90
+
+    # Gentle transitions (very important in shared room)
+    transition_duration: 6  # Extra gentle to not disturb either child
+#
+# Expected Behavior:
+#   - Lights turn on at 7 PM when first child goes to bed
+#   - Lights stay on continuously through both bedtimes
+#   - Lights remain on until 7:30 AM (after both children awake)
+#   - Motion triggers boost if either child gets up
+#
+# Rationale:
+#   - Single automation simpler than coordinating multiple
+#   - Covers full time window when ANY child needs night light
+#   - Extra gentle transitions important when one child already sleeping
+#
+# Alternative: Different Light Zones
+#   If children have separate areas of room:
+#   - Create two automations (one per child/light)
+#   - Each child's light on their specific schedule
+#   - Allows customization per child's needs
+
+---
+
+# ==============================================================================
+# EXAMPLE 6: Summer vs Winter Schedule Adjustment
+# ==============================================================================
+#
+# Use Case:
+#   Bedtime shifts with seasons (later in summer, earlier in winter due to
+#   natural light patterns). This example shows TWO automations you can
+#   toggle between seasons.
+#
+# SUMMER SCHEDULE:
+alias: "Child Night Light - Summer Schedule"
+description: Later bedtime for summer months (June-August)
+use_blueprint:
+  path: child_night_light.yaml
+  input:
+    target_lights:
+      entity_id: light.bedroom_lamp
+
+    base_brightness: 3
+    color_temperature: 2000
+
+    # SUMMER: Later bedtime due to daylight
+    nighttime_enabled: true
+    nighttime_start: "20:30:00"  # 8:30 PM (still light outside)
+    nighttime_end: "07:30:00"    # 7:30 AM (sleeping in a bit)
+
+    nap1_enabled: true
+    nap1_start: "14:00:00"  # Later nap
+    nap1_end: "16:00:00"
+
+    nap2_enabled: false
+
+    motion_sensor: binary_sensor.bedroom_motion
+    motion_brightness_boost: 10
+    motion_boost_duration: 60
+
+    transition_duration: 4
+#
+# WINTER SCHEDULE:
+alias: "Child Night Light - Winter Schedule"
+description: Earlier bedtime for winter months (November-February)
+use_blueprint:
+  path: child_night_light.yaml
+  input:
+    target_lights:
+      entity_id: light.bedroom_lamp
+
+    base_brightness: 3
+    color_temperature: 2000
+
+    # WINTER: Earlier bedtime due to darkness
+    nighttime_enabled: true
+    nighttime_start: "18:30:00"  # 6:30 PM (dark outside)
+    nighttime_end: "07:00:00"    # 7:00 AM (typical wake time)
+
+    nap1_enabled: true
+    nap1_start: "13:00:00"  # Standard nap time
+    nap1_end: "15:00:00"
+
+    nap2_enabled: false
+
+    motion_sensor: binary_sensor.bedroom_motion
+    motion_brightness_boost: 10
+    motion_boost_duration: 60
+
+    transition_duration: 4
+#
+# Usage:
+#   - Create both automations
+#   - Manually disable the off-season automation
+#   - Enable the current season automation
+#   - Toggle twice per year (or use automation to toggle automations!)
+#
+# Advanced: Automatic Seasonal Switching
+#   You could create a separate automation that:
+#   - Triggers on specific dates (June 1, November 1)
+#   - Disables one automation and enables the other
+#   - Requires automation.turn_on and automation.turn_off services
+
+---
+
+# ==============================================================================
+# EXAMPLE 7: Ultra-Sensitive Sleeper (Any Age)
+# ==============================================================================
+#
+# Use Case:
+#   Child who is extremely sensitive to any light or changes. Needs absolute
+#   minimum brightness, gentlest transitions, and no motion triggers that might
+#   disturb sleep.
+#
+# Configuration:
+alias: "Night Light - Ultra Sensitive Sleeper"
+description: Minimum brightness, no motion triggers, maximum gentleness
+use_blueprint:
+  path: child_night_light.yaml
+  input:
+    # Single small light, positioned away from bed
+    target_lights:
+      entity_id: light.corner_lamp
+
+    # Absolute minimum settings
+    base_brightness: 1  # Lowest possible
+    color_temperature: 1700  # Warmest possible (match flame)
+
+    # Standard schedule
+    nighttime_enabled: true
+    nighttime_start: "19:00:00"
+    nighttime_end: "07:00:00"
+
+    # Naps as needed
+    nap1_enabled: true
+    nap1_start: "13:00:00"
+    nap1_end: "15:00:00"
+
+    nap2_enabled: false
+
+    # NO motion sensor (avoid any changes during sleep)
+    motion_sensor: {}
+
+    # Maximum gentleness
+    transition_duration: 10  # Very slow, imperceptible changes
+#
+# Expected Behavior:
+#   - Barely visible warm glow (like distant candle)
+#   - Absolutely no changes during sleep period
+#   - Ultra-slow fade-in and fade-out
+#   - Minimal circadian impact
+#
+# Rationale:
+#   - 1% brightness is absolute minimum most lights support
+#   - 1700K is warmest available (candlelight spectrum)
+#   - No motion sensor prevents any disturbance
+#   - 10 second transitions are imperceptible
+#
+# Additional Recommendations:
+#   - Use smallest wattage smart bulb available
+#   - Position lamp facing wall/corner (indirect light)
+#   - Use lampshade to further diffuse
+#   - Consider gradual elimination of light over time
+
+---
+
+# ==============================================================================
+# EXAMPLE 8: Different Settings for Different Rooms
+# ==============================================================================
+#
+# Use Case:
+#   Want different brightness/behavior for bedroom vs. bathroom vs. hallway.
+#   This shows THREE separate automations for one child's sleep environment.
+#
+# BEDROOM - Very Low:
+alias: "Night Light - Bedroom (Sleeping)"
+description: Ultra-low bedroom lighting where child sleeps
+use_blueprint:
+  path: child_night_light.yaml
+  input:
+    target_lights:
+      entity_id: light.bedroom_lamp
+
+    base_brightness: 2  # Very low for sleeping
+    color_temperature: 2000
+
+    nighttime_enabled: true
+    nighttime_start: "19:00:00"
+    nighttime_end: "07:00:00"
+
+    nap1_enabled: true
+    nap1_start: "13:00:00"
+    nap1_end: "15:00:00"
+
+    nap2_enabled: false
+
+    # Motion triggers BEDROOM brightness boost
+    motion_sensor: binary_sensor.bedroom_motion
+    motion_brightness_boost: 8  # Low boost in sleeping area
+    motion_boost_duration: 60
+
+    transition_duration: 5
+
+---
+
+# HALLWAY - Medium:
+alias: "Night Light - Hallway (Navigation)"
+description: Moderate hallway lighting for safe walking
+use_blueprint:
+  path: child_night_light.yaml
+  input:
+    target_lights:
+      entity_id: light.hallway_ceiling
+
+    base_brightness: 5  # Higher for safety
+    color_temperature: 2000
+
+    # Same schedule as bedroom
+    nighttime_enabled: true
+    nighttime_start: "19:00:00"
+    nighttime_end: "07:00:00"
+
+    nap1_enabled: false  # Don't need hallway light during naps
+    nap2_enabled: false
+
+    # Motion triggers HALLWAY brightness boost
+    motion_sensor: binary_sensor.hallway_motion
+    motion_brightness_boost: 18  # Significant boost for safe walking
+    motion_boost_duration: 90
+
+    transition_duration: 3
+
+---
+
+# BATHROOM - Highest:
+alias: "Night Light - Bathroom (Functional)"
+description: Functional bathroom lighting for nighttime use
+use_blueprint:
+  path: child_night_light.yaml
+  input:
+    target_lights:
+      entity_id: light.bathroom_vanity
+
+    base_brightness: 8  # Higher base for functionality
+    color_temperature: 2200  # Slightly less strict
+
+    # Same schedule
+    nighttime_enabled: true
+    nighttime_start: "19:00:00"
+    nighttime_end: "07:00:00"
+
+    nap1_enabled: false  # Unlikely to need bathroom during nap
+    nap2_enabled: false
+
+    # Motion triggers BATHROOM brightness boost
+    motion_sensor: binary_sensor.bathroom_motion
+    motion_brightness_boost: 25  # High enough to be functional
+    motion_boost_duration: 120  # Longer for bathroom tasks
+
+    transition_duration: 2
+#
+# Expected Behavior:
+#   - Bedroom: Very dim (2%), protects sleep
+#   - Hallway: Dim (5%), provides safe path
+#   - Bathroom: Functional (8%), allows use
+#   - Each room has appropriate motion boost
+#
+# Rationale:
+#   - Different rooms have different needs
+#   - Bedroom prioritizes sleep protection
+#   - Hallway prioritizes navigation safety
+#   - Bathroom prioritizes functionality
+#   - All maintain warm amber color for circadian protection
+
+---
+
+# ==============================================================================
+# NOTES AND TIPS
+# ==============================================================================
+#
+# General Configuration Tips:
+#
+# 1. START CONSERVATIVE:
+#    Begin with very low brightness (2-3%) and increase if needed.
+#    It's safer to start too dim than too bright.
+#
+# 2. TEST DURING DAY:
+#    Trigger automation manually during daytime to verify:
+#    - Color temperature looks correct (warm amber)
+#    - Brightness is appropriate
+#    - Motion sensors work properly
+#    - Transitions are smooth
+#
+# 3. MONITOR SLEEP QUALITY:
+#    Watch for 3-5 days after configuration:
+#    - Is child falling asleep easily?
+#    - Sleeping through night?
+#    - Waking refreshed?
+#    Adjust if sleep quality decreases.
+#
+# 4. GRADUAL CHANGES:
+#    If adjusting settings, change ONE thing at a time:
+#    - Week 1: Reduce brightness by 1%
+#    - Week 2: Observe
+#    - Week 3: Reduce another 1% if successful
+#
+# 5. AGE PROGRESSION:
+#    As child grows, gradually:
+#    - Reduce brightness
+#    - Shorten duration (turn off mid-night)
+#    - Eventually eliminate if possible
+#
+# Motion Sensor Tips:
+#
+# 1. POSITIONING:
+#    - Nursery: Aim at doorway, away from crib
+#    - Bedroom: Aim at bed exit point
+#    - Hallway: Aim at walking path
+#    - Bathroom: Aim at entrance
+#
+# 2. SENSITIVITY:
+#    - Too sensitive: Triggers from sleeping movement
+#    - Too low: Doesn't trigger when needed
+#    - Adjust sensor settings if available
+#
+# 3. HEIGHT:
+#    - Mount at child's standing height
+#    - Too high: Won't detect toddler
+#    - Too low: Triggers from pets
+#
+# Light Selection Tips:
+#
+# 1. BULB CHOICE:
+#    - Philips Hue: Excellent color range, reliable
+#    - IKEA TRADFRI: Budget-friendly, good performance
+#    - Generic brands: Test color temperature support
+#
+# 2. BRIGHTNESS CAPABILITY:
+#    - Ensure bulb can dim to 1-3% (not all can)
+#    - Test minimum brightness before relying on it
+#    - Lower wattage bulbs generally dim better
+#
+# 3. POSITIONING:
+#    - Face lamp away from bed (indirect light)
+#    - Use corner or low placement
+#    - Consider under-bed or baseboard placement
+#    - Add lampshades to diffuse
+#
+# Color Temperature Notes:
+#
+# - 1700K = Candlelight (warmest)
+# - 2000K = Firelight (recommended default)
+# - 2200K = Early sunrise (still very safe)
+# - 2700K = Warm white (maximum for children)
+# - 3000K+ = NOT recommended for sleep
+#
+# If your bulb can't reach 2000K:
+# - Use lowest available (2700K minimum)
+# - Reduce brightness even further
+# - Consider different bulb brand
+#
+# Common Mistakes to Avoid:
+#
+# 1. ❌ Too bright "just to be safe"
+#    ✅ Start very dim, increase only if needed
+#
+# 2. ❌ Using cool white or blue-tinted light
+#    ✅ Always use warm amber (≤2700K)
+#
+# 3. ❌ Pointing light directly at child's bed
+#    ✅ Use indirect lighting (face wall/corner)
+#
+# 4. ❌ Very fast transitions
+#    ✅ Use 3-5+ second gentle fades
+#
+# 5. ❌ Same brightness for all ages
+#    ✅ Adjust for child's age and sensitivity
+#
+# 6. ❌ Never adjusting as child grows
+#    ✅ Gradually reduce dependence over time
+#
+# 7. ❌ Ignoring child's individual response
+#    ✅ Customize based on your specific child's needs

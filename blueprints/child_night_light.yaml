@@ -1,0 +1,424 @@
+blueprint:
+  name: Child-Friendly Night Light Automation (Ages 1-5)
+  description: >
+    Scientifically-backed night light automation designed specifically for young children
+    (ages 1-5). Based on peer-reviewed research, this blueprint uses warm amber/red light
+    colors and carefully controlled brightness levels to minimize melatonin suppression
+    and protect developing eyes while providing safe nighttime visibility.
+
+
+    Research shows that young children are EXTREMELY sensitive to light - even 5-40 lux
+    can suppress melatonin by 78% in preschool-aged children. This blueprint defaults to
+    very low brightness levels (1-5% of light capacity, approximately 1-2 lux) and uses
+    warm amber tones (2000K or lower) which studies show have minimal impact on sleep,
+    even at higher intensities.
+
+
+    Features:
+    - Ultra-low nighttime brightness (research-backed safe levels)
+    - Warm amber/red color temperature (2000K) to protect melatonin production
+    - Up to 3 configurable time slots (nighttime, nap 1, nap 2)
+    - Optional motion-activated brightness boost with auto-return to base level
+    - Smooth transitions to avoid startling children
+    - Compatible with Philips Hue and other tunable white lights
+
+
+    Perfect for nurseries, children's bedrooms, and hallways leading to bathrooms.
+
+  domain: automation
+  source_url: https://github.com/yourusername/ha-blueprints/child-night-light
+
+  input:
+    # === LIGHTS SECTION ===
+    target_lights:
+      name: Night Lights
+      description: >
+        Select up to 4 lights to use as night lights. These lights MUST support
+        color temperature adjustment (tunable white or white ambiance bulbs).
+        For best results, use lights that support very low brightness levels.
+      selector:
+        target:
+          entity:
+            - domain: light
+
+    # === NIGHTTIME BRIGHTNESS SETTINGS ===
+    base_brightness:
+      name: Base Nighttime Brightness
+      description: >
+        The default brightness level during sleep/nap times. Based on research,
+        this should be VERY LOW (1-5%) to minimize melatonin suppression in young
+        children. Default is 3%, which provides gentle visibility without disrupting
+        sleep. Even 5 lux can suppress melatonin by 78% in preschool children, so
+        keeping lights dim is critical.
+      default: 3
+      selector:
+        number:
+          min: 1
+          max: 15
+          step: 1
+          unit_of_measurement: "%"
+          mode: slider
+
+    color_temperature:
+      name: Color Temperature
+      description: >
+        The color temperature for the night light in Kelvin. Research strongly
+        recommends warm amber/red tones (2000K or below) for children's sleep.
+        Studies show that even very bright amber light (800 lux) has minimal effect
+        on melatonin production, while cooler temperatures severely disrupt sleep.
+        Default is 2000K (warm amber). NEVER use temperatures above 2700K for children's
+        night lights.
+      default: 2000
+      selector:
+        number:
+          min: 1700
+          max: 2700
+          step: 100
+          unit_of_measurement: "K"
+          mode: slider
+
+    # === NIGHTTIME SCHEDULE ===
+    nighttime_enabled:
+      name: Enable Nighttime Schedule
+      description: >
+        Enable the nighttime schedule (typically bedtime through morning wake-up).
+        This is the primary sleep period for most children.
+      default: true
+      selector:
+        boolean:
+
+    nighttime_start:
+      name: Nighttime Start Time
+      description: >
+        When should the nighttime lights turn on? This is typically bedtime.
+        Example - 7:00 PM or 8:00 PM
+      default: "19:00:00"
+      selector:
+        time:
+
+    nighttime_end:
+      name: Nighttime End Time
+      description: >
+        When should the nighttime lights turn off? This is typically wake-up time.
+        Example - 7:00 AM
+      default: "07:00:00"
+      selector:
+        time:
+
+    # === NAP TIME SLOT 1 ===
+    nap1_enabled:
+      name: Enable Nap Time Slot 1
+      description: >
+        Enable a daytime nap schedule. This is typically the morning nap for younger
+        toddlers or the single afternoon nap for older toddlers. Disable if your child
+        no longer naps or you don't need automated night lights during nap time.
+      default: false
+      selector:
+        boolean:
+
+    nap1_start:
+      name: Nap 1 Start Time
+      description: >
+        When should nap time 1 begin? Example - 9:00 AM (morning nap) or 1:00 PM
+        (afternoon nap)
+      default: "13:00:00"
+      selector:
+        time:
+
+    nap1_end:
+      name: Nap 1 End Time
+      description: >
+        When should nap time 1 end? Example - 11:00 AM or 3:00 PM
+      default: "15:00:00"
+      selector:
+        time:
+
+    # === NAP TIME SLOT 2 ===
+    nap2_enabled:
+      name: Enable Nap Time Slot 2
+      description: >
+        Enable a second nap schedule. This is useful for younger toddlers who still
+        take multiple naps per day. Disable if not needed.
+      default: false
+      selector:
+        boolean:
+
+    nap2_start:
+      name: Nap 2 Start Time
+      description: When should nap time 2 begin? Example - 3:00 PM
+      default: "15:00:00"
+      selector:
+        time:
+
+    nap2_end:
+      name: Nap 2 End Time
+      description: When should nap time 2 end? Example - 5:00 PM
+      default: "17:00:00"
+      selector:
+        time:
+
+    # === MOTION SENSOR SETTINGS ===
+    motion_sensor:
+      name: Motion Sensor (Optional)
+      description: >
+        Optional: Select a motion sensor to trigger a temporary brightness boost.
+        When motion is detected during an active sleep period, lights will briefly
+        increase in brightness (helpful when checking on child or during bathroom trips),
+        then return to the base level after no motion is detected. Leave empty to
+        disable motion-based brightness boost.
+      default: {}
+      selector:
+        entity:
+          filter:
+            - domain: binary_sensor
+              device_class: motion
+
+    motion_brightness_boost:
+      name: Motion Brightness Boost
+      description: >
+        How much should the brightness increase when motion is detected? This is
+        the TOTAL brightness during motion, not added to base. Recommended: 8-15%
+        to provide visibility without being too bright. This still maintains warm
+        amber color to minimize sleep disruption.
+      default: 10
+      selector:
+        number:
+          min: 5
+          max: 30
+          step: 1
+          unit_of_measurement: "%"
+          mode: slider
+
+    motion_boost_duration:
+      name: Motion Boost Duration
+      description: >
+        How long should the brightness stay boosted after motion stops? After this
+        duration, lights return to the base nighttime brightness. Recommended: 30-120
+        seconds to allow for checking on child or bathroom visits.
+      default: 60
+      selector:
+        number:
+          min: 15
+          max: 300
+          step: 15
+          unit_of_measurement: seconds
+          mode: slider
+
+    # === TRANSITION SETTINGS ===
+    transition_duration:
+      name: Transition Duration
+      description: >
+        How smoothly should lights fade when changing brightness? Longer transitions
+        are gentler and less likely to startle sleeping children. Recommended: 3-5
+        seconds for calm, barely-noticeable changes.
+      default: 4
+      selector:
+        number:
+          min: 1
+          max: 10
+          step: 1
+          unit_of_measurement: seconds
+          mode: slider
+
+# Use restart mode so that state changes reset the automation cleanly
+mode: restart
+max_exceeded: silent
+
+variables:
+  # Convert inputs to variables for easier reference
+  motion_entity: !input motion_sensor
+  base_brightness_pct: !input base_brightness
+  motion_brightness_pct: !input motion_brightness_boost
+  motion_duration: !input motion_boost_duration
+  color_temp_kelvin: !input color_temperature
+  transition_time: !input transition_duration
+
+  # Time slot enabled flags
+  nighttime_active: !input nighttime_enabled
+  nap1_active: !input nap1_enabled
+  nap2_active: !input nap2_enabled
+
+  # Time boundaries for each slot
+  nighttime_start_time: !input nighttime_start
+  nighttime_end_time: !input nighttime_end
+  nap1_start_time: !input nap1_start
+  nap1_end_time: !input nap1_end
+  nap2_start_time: !input nap2_start
+  nap2_end_time: !input nap2_end
+
+  # Convert Kelvin to mireds for Philips Hue compatibility
+  # Formula: mireds = 1,000,000 / kelvin
+  # CRITICAL: Never use both kelvin and color_temp in the same service call
+  color_temp_mireds: "{{ (1000000 / color_temp_kelvin|int) | int }}"
+
+  # Calculate if we're currently in an active time slot
+  # This is used by the trigger condition and time-based automation
+  currently_active: >
+    {% set current_time = now() %}
+    {% set current = current_time.hour * 3600 + current_time.minute * 60 + current_time.second %}
+
+    {# Helper function to check if current time is in a range #}
+    {% macro in_time_range(start_str, end_str) %}
+      {% set start_parts = start_str.split(':') %}
+      {% set end_parts = end_str.split(':') %}
+      {% set start_sec = start_parts[0]|int * 3600 + start_parts[1]|int * 60 %}
+      {% set end_sec = end_parts[0]|int * 3600 + end_parts[1]|int * 60 %}
+
+      {# Handle wraparound (e.g., 11 PM to 7 AM) #}
+      {% if start_sec > end_sec %}
+        {{ current >= start_sec or current < end_sec }}
+      {% else %}
+        {{ current >= start_sec and current < end_sec }}
+      {% endif %}
+    {% endmacro %}
+
+    {# Check each enabled time slot #}
+    {% set in_nighttime = nighttime_active and in_time_range(nighttime_start_time, nighttime_end_time) %}
+    {% set in_nap1 = nap1_active and in_time_range(nap1_start_time, nap1_end_time) %}
+    {% set in_nap2 = nap2_active and in_time_range(nap2_start_time, nap2_end_time) %}
+
+    {{ in_nighttime or in_nap1 or in_nap2 }}
+
+trigger:
+  # Trigger 1: When any enabled time slot starts, turn on lights
+  - platform: time
+    at: !input nighttime_start
+    id: nighttime_start_trigger
+
+  - platform: time
+    at: !input nap1_start
+    id: nap1_start_trigger
+
+  - platform: time
+    at: !input nap2_start
+    id: nap2_start_trigger
+
+  # Trigger 2: When any enabled time slot ends, turn off lights
+  - platform: time
+    at: !input nighttime_end
+    id: nighttime_end_trigger
+
+  - platform: time
+    at: !input nap1_end
+    id: nap1_end_trigger
+
+  - platform: time
+    at: !input nap2_end
+    id: nap2_end_trigger
+
+  # Trigger 3: When motion sensor detects motion (if configured)
+  - platform: state
+    entity_id: !input motion_sensor
+    to: "on"
+    id: motion_detected
+
+condition: []
+
+action:
+  - choose:
+      # === SCENARIO 1: Time slot STARTING (turn on lights) ===
+      - conditions:
+          - condition: or
+            conditions:
+              - condition: and
+                conditions:
+                  - condition: trigger
+                    id: nighttime_start_trigger
+                  - condition: template
+                    value_template: "{{ nighttime_active }}"
+
+              - condition: and
+                conditions:
+                  - condition: trigger
+                    id: nap1_start_trigger
+                  - condition: template
+                    value_template: "{{ nap1_active }}"
+
+              - condition: and
+                conditions:
+                  - condition: trigger
+                    id: nap2_start_trigger
+                  - condition: template
+                    value_template: "{{ nap2_active }}"
+        sequence:
+          # Turn on lights with base nighttime settings (gentle fade-in)
+          - service: light.turn_on
+            target: !input target_lights
+            data:
+              brightness_pct: "{{ base_brightness_pct }}"
+              color_temp: "{{ color_temp_mireds }}"
+              transition: "{{ transition_time }}"
+
+      # === SCENARIO 2: Time slot ENDING (turn off lights) ===
+      - conditions:
+          - condition: or
+            conditions:
+              - condition: and
+                conditions:
+                  - condition: trigger
+                    id: nighttime_end_trigger
+                  - condition: template
+                    value_template: "{{ nighttime_active }}"
+
+              - condition: and
+                conditions:
+                  - condition: trigger
+                    id: nap1_end_trigger
+                  - condition: template
+                    value_template: "{{ nap1_active }}"
+
+              - condition: and
+                conditions:
+                  - condition: trigger
+                    id: nap2_end_trigger
+                  - condition: template
+                    value_template: "{{ nap2_active }}"
+        sequence:
+          # Turn off lights with gentle fade-out
+          - service: light.turn_off
+            target: !input target_lights
+            data:
+              transition: "{{ transition_time }}"
+
+      # === SCENARIO 3: Motion detected during active time slot ===
+      - conditions:
+          - condition: trigger
+            id: motion_detected
+          - condition: template
+            value_template: "{{ motion_entity != none and motion_entity != '' }}"
+          - condition: template
+            value_template: "{{ currently_active }}"
+        sequence:
+          # Temporarily boost brightness for visibility (maintain warm color)
+          - service: light.turn_on
+            target: !input target_lights
+            data:
+              brightness_pct: "{{ motion_brightness_pct }}"
+              color_temp: "{{ color_temp_mireds }}"
+              transition: "{{ transition_time }}"
+
+          # Wait for motion to clear
+          - wait_for_trigger:
+              - platform: state
+                entity_id: !input motion_sensor
+                to: "off"
+                for:
+                  seconds: "{{ motion_duration }}"
+            timeout:
+              hours: 2
+            continue_on_timeout: false
+
+          # Return to base nighttime brightness
+          # But only if we're still in an active time slot
+          - condition: template
+            value_template: "{{ currently_active }}"
+
+          - service: light.turn_on
+            target: !input target_lights
+            data:
+              brightness_pct: "{{ base_brightness_pct }}"
+              color_temp: "{{ color_temp_mireds }}"
+              transition: "{{ transition_time }}"
+
+    # Default: Do nothing (shouldn't reach here, but safety fallback)
+    default: []

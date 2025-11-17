@@ -1,8 +1,20 @@
-# Circadian Rhythm Lighting Blueprint for Home Assistant
+# Home Assistant Blueprints - Research-Backed Lighting Automation
 
-A scientifically-backed Home Assistant blueprint that automatically adjusts your lights' color temperature throughout the day to mimic natural sunlight patterns, promoting better sleep, alertness, and overall wellbeing.
+Scientifically-backed Home Assistant blueprints for intelligent lighting automation. Each blueprint is built on peer-reviewed research to promote better sleep, health, and wellbeing through optimized light control.
 
-## Features
+## Available Blueprints
+
+### 1. Circadian Rhythm Lighting with Motion Control
+Automatically adjusts light color temperature throughout the day to mimic natural sunlight patterns, promoting better sleep, alertness, and overall wellbeing.
+
+### 2. Child-Friendly Night Light Automation (Ages 1-5)
+Research-based night light automation specifically designed for young children's sensitive sleep physiology. Ultra-low brightness and warm amber light minimize melatonin suppression while providing safe nighttime visibility.
+
+---
+
+## Circadian Rhythm Lighting
+
+### Features
 
 - **6 Scientifically-Backed Circadian Phases** - From warm 2000K sunrise to cool 5500K midday
 - **Motion-Activated** - Lights respond to motion sensors with configurable timeout
@@ -74,11 +86,17 @@ Works with any lights supporting `color_temp` or `kelvin` attributes:
 
 ## Documentation
 
+### Circadian Rhythm Lighting
 - [**Installation Guide**](docs/INSTALLATION_GUIDE.md) - Step-by-step setup instructions
 - [**Circadian Lighting README**](docs/CIRCADIAN_LIGHTING_README.md) - Scientific background and detailed documentation
 - [**Quick Reference**](docs/QUICK_REFERENCE.md) - One-page cheat sheet
 - [**Example Automations**](examples/EXAMPLE_AUTOMATION.yaml) - 6 real-world configuration examples
 - [**Project Summary**](docs/PROJECT_SUMMARY.md) - Complete project overview
+
+### Child Night Light
+- [**Child Night Light Installation**](docs/CHILD_NIGHT_LIGHT_INSTALLATION.md) - Quick start guide with templates
+- [**Child Night Light README**](docs/CHILD_NIGHT_LIGHT_README.md) - Comprehensive documentation with research citations
+- [**Child Night Light Examples**](examples/child_night_light_examples.yaml) - 8 detailed real-world scenarios
 
 ## Examples
 
@@ -98,15 +116,71 @@ Works with any lights supporting `color_temp` or `kelvin` attributes:
 
 See [`examples/EXAMPLE_AUTOMATION.yaml`](examples/EXAMPLE_AUTOMATION.yaml) for complete configurations.
 
+---
+
+## Child-Friendly Night Light (Ages 1-5)
+
+### Key Features
+
+- **Research-Backed Defaults**: Based on peer-reviewed studies of children's light sensitivity
+- **Ultra-Low Brightness** (1-5%): Minimizes melatonin suppression in highly sensitive young children
+- **Warm Amber Color** (2000K): Studies show minimal circadian impact even at higher intensities
+- **3 Configurable Time Slots**: Nighttime + 2 optional nap periods (each can be enabled/disabled)
+- **Motion-Activated Brightness Boost**: Temporarily increases brightness for parent checks, then returns to base
+- **Smooth Transitions**: Gentle changes prevent startling sleeping children
+- **Age-Specific Recommendations**: Detailed guidance for ages 1-2, 2-3, 3-4, and 4-5
+
+### Scientific Research Summary
+
+This blueprint implements findings from multiple peer-reviewed studies:
+
+**Key Research Finding**: Preschool-aged children experience 87.6% melatonin suppression from bright light and 77.5% suppression even from very dim light (5-40 lux). Melatonin remains suppressed for 50+ minutes after exposure ends.
+
+- **Children are FAR more sensitive than adults**: Blue-enriched light (6200K) significantly suppresses melatonin in children but not adults
+- **Amber/red light is safe**: Even 800 lux of amber light has minimal impact on melatonin production
+- **Recommended maximum**: 1.5 lux for children's sleep environments
+- **Blueprint default**: 3% brightness (~1-2 lux) with 2000K warm amber color
+
+*Full research citations in the detailed documentation*
+
+### Quick Start - Child Night Light
+
+**Import URL:**
+```
+https://raw.githubusercontent.com/leviemartin/HomeAssistant-Repo/main/blueprints/child_night_light.yaml
+```
+
+1. Import blueprint (Settings → Automations & Scenes → Blueprints → Import Blueprint)
+2. Create automation and configure:
+   - **Night Lights**: Select 1-4 lights (must support color temperature)
+   - **Nighttime Schedule**: Set bedtime and wake-up time
+   - **Use default settings**: Already optimized based on research (3% brightness, 2000K)
+   - **Optional**: Add motion sensor for automatic brightness boost during nighttime checks
+3. Done! Research-backed safe lighting for your child
+
+See the [Installation Guide](docs/CHILD_NIGHT_LIGHT_INSTALLATION.md) for detailed setup instructions and configuration templates.
+
+---
+
 ## Scientific Background
 
-This blueprint is based on research into:
+### Circadian Rhythm Lighting
+Based on research into:
 - Natural sunlight variation throughout the day (2000K-6600K)
 - Blue light's effect on melatonin suppression and alertness
 - Melanopsin photopigment response to different wavelengths
 - Circadian rhythm optimization for sleep quality
 
 Color temperatures and timing are designed to support your body's natural circadian cycle while providing appropriate lighting for daily activities.
+
+### Child Night Light
+Based on peer-reviewed pediatric sleep research:
+- Hartstein et al. (2022) - High sensitivity of melatonin suppression in preschool children
+- Lee et al. (2018) - Blue-enriched light effects in children vs. adults
+- Akacem et al. (2022) - Light exposure timing and duration effects
+- Multiple studies on amber/red wavelength safety for children's sleep
+
+All defaults are set to research-backed safe levels for ages 1-5.
 
 ## Customization
 
