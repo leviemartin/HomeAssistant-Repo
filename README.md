@@ -7,8 +7,28 @@ Scientifically-backed Home Assistant blueprints for intelligent lighting automat
 ### 1. Circadian Rhythm Lighting with Motion Control
 Automatically adjusts light color temperature throughout the day to mimic natural sunlight patterns, promoting better sleep, alertness, and overall wellbeing.
 
-### 2. Child-Friendly Night Light Automation (Ages 1-5)
+**Import URL:**
+```
+https://raw.githubusercontent.com/leviemartin/HomeAssistant-Repo/main/blueprints/circadian_rhythm_lighting.yaml
+```
+
+### 2. Sun-Aware Circadian Rhythm Lighting (Netherlands Optimized) ⭐ NEW
+Enhanced version that tracks actual sun position for locations with extreme seasonal daylight variations. Perfect for Netherlands where summer sun sets at 10pm and winter sun barely rises. Includes bedtime overrides to maintain family routines regardless of sun position.
+
+**Import URL:**
+```
+https://raw.githubusercontent.com/leviemartin/HomeAssistant-Repo/main/blueprints/circadian_rhythm_lighting_sun_aware.yaml
+```
+
+[📖 Quick Start Guide](blueprints/QUICK_START.md) | [🔬 Scientific Details](blueprints/SUN_AWARE_UPGRADE_GUIDE.md) | [⚖️ Feature Comparison](blueprints/FEATURE_COMPARISON.md)
+
+### 3. Child-Friendly Night Light Automation (Ages 1-5)
 Research-based night light automation specifically designed for young children's sensitive sleep physiology. Ultra-low brightness and warm amber light minimize melatonin suppression while providing safe nighttime visibility.
+
+**Import URL:**
+```
+https://raw.githubusercontent.com/leviemartin/HomeAssistant-Repo/main/blueprints/child_night_light.yaml
+```
 
 ---
 
@@ -115,6 +135,53 @@ Works with any lights supporting `color_temp` or `kelvin` attributes:
 ```
 
 See [`examples/EXAMPLE_AUTOMATION.yaml`](examples/EXAMPLE_AUTOMATION.yaml) for complete configurations.
+
+---
+
+## Sun-Aware Circadian Rhythm Lighting ⭐ NEW
+
+### Key Features
+
+- **Real Sun Position Tracking** - Uses Home Assistant's sun.sun entity for authentic natural lighting
+- **Netherlands Optimized** - Handles extreme seasonal variations (5:30am-10pm summer, 8:45am-4:30pm winter)
+- **Bedtime Override System**:
+  - Kids bedtime (~7pm) → Forces 2200K warm light even if sun still up
+  - Parents bedtime (~10pm) → Forces 2200K regardless of season
+- **Smart Time Boundaries** - Prevents 5:30am summer wake-ups, ensures 9am winter routines
+- **Hybrid Operating Modes**:
+  - **Hybrid** (recommended): Sun-aware during day, fixed schedule for evening
+  - **Full Sun**: Always follows sun elevation
+  - **Conservative**: Sun hints with strict boundaries
+  - **Fixed-Time**: Original blueprint behavior (backward compatible)
+- **Scientific Sun Elevation Mapping**:
+  - Below -6°: 2200K (deep twilight, sleep-friendly)
+  - -6° to 0°: 2200-3000K (civil twilight)
+  - 0° to 10°: 3000-3500K (low sun, energizing morning)
+  - 10° to 30°: 3500-4500K (rising/falling sun)
+  - 30° to 50°: 4500-5500K (high sun, peak alertness)
+  - Above 50°: 5500K (maximum alertness)
+- **Advanced Lux Intelligence** - Summer evening detection (outdoor bright, indoor dark with curtains)
+
+### Quick Start
+
+See [📖 QUICK_START.md](blueprints/QUICK_START.md) for 5-minute setup guide.
+
+**Recommended Configuration for Netherlands Families:**
+```yaml
+sun_tracking_enabled: true
+sun_tracking_mode: "hybrid"
+kids_bedtime: "19:00:00"  # 7pm
+parents_bedtime: "22:00:00"  # 10pm
+morning_earliest: "07:00:00"
+evening_latest: "20:30:00"
+```
+
+### Documentation
+
+- [📖 Quick Start Guide](blueprints/QUICK_START.md) - 5-minute setup
+- [🔬 Scientific Details & Upgrade Guide](blueprints/SUN_AWARE_UPGRADE_GUIDE.md) - Research basis, edge cases
+- [⚖️ Feature Comparison](blueprints/FEATURE_COMPARISON.md) - Original vs sun-aware
+- [🔧 Technical Implementation](blueprints/CHANGES_SUMMARY.md) - Complete technical details
 
 ---
 
