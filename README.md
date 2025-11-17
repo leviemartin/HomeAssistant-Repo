@@ -22,7 +22,17 @@ https://raw.githubusercontent.com/leviemartin/HomeAssistant-Repo/main/blueprints
 
 [📖 Quick Start Guide](blueprints/QUICK_START.md) | [🔬 Scientific Details](blueprints/SUN_AWARE_UPGRADE_GUIDE.md) | [⚖️ Feature Comparison](blueprints/FEATURE_COMPARISON.md)
 
-### 3. Child-Friendly Night Light Automation (Ages 1-5)
+### 3. Intelligent Living Room Lighting (mmWave + Lux Aware) ⭐ NEW
+Advanced living room automation with Aqara FP2 mmWave presence detection, natural light awareness, and anti-flicker protection. Features sun-aware circadian rhythm integration, dynamic brightness scaling, and staged turn-off warnings.
+
+**Import URL:**
+```
+https://raw.githubusercontent.com/leviemartin/HomeAssistant-Repo/main/blueprints/intelligent_living_room_mmwave_lux_aware.yaml
+```
+
+[📖 Quick Start](blueprints/INTELLIGENT_LIVING_ROOM_QUICK_START.md) | [📘 Complete Setup Guide](blueprints/INTELLIGENT_LIVING_ROOM_SETUP_GUIDE.md) | [🔬 Anti-Flicker Technical Guide](blueprints/ANTI_FLICKER_TECHNICAL_GUIDE.md) | [📡 FP2 Features Reference](blueprints/FP2_FEATURES_REFERENCE.md)
+
+### 4. Child-Friendly Night Light Automation (Ages 1-5)
 Research-based night light automation specifically designed for young children's sensitive sleep physiology. Ultra-low brightness and warm amber light minimize melatonin suppression while providing safe nighttime visibility.
 
 **Import URL:**
@@ -182,6 +192,73 @@ evening_latest: "20:30:00"
 - [🔬 Scientific Details & Upgrade Guide](blueprints/SUN_AWARE_UPGRADE_GUIDE.md) - Research basis, edge cases
 - [⚖️ Feature Comparison](blueprints/FEATURE_COMPARISON.md) - Original vs sun-aware
 - [🔧 Technical Implementation](blueprints/CHANGES_SUMMARY.md) - Complete technical details
+
+---
+
+## Intelligent Living Room Lighting ⭐ NEW
+
+### Key Features
+
+- **Anti-Flicker Hysteresis** - 150 lux OFF / 80 lux ON with 50 lux dead band prevents oscillation
+- **Time-Based Debouncing** - 5 min stable before OFF (cloud protection), 2 min before ON
+- **Extended Sunrise/Sunset Debounce** - 10 minutes during transitions (1 hour window)
+- **Aqara FP2 mmWave Integration**:
+  - Approach detection (lights on when approaching)
+  - Built-in lux sensor support
+  - Future-ready for zones, target count, fall detection
+- **Dynamic Brightness Scaling** - Inverse relationship with natural light (100% @ ≤50 lux → 40% @ 150 lux)
+- **Sun-Aware Circadian Rhythm**:
+  - 1800K-5500K based on sun elevation
+  - 60-second continuous updates
+  - 3-5 second smooth transitions
+  - Adapted from sun-aware blueprint
+- **Staged Turn-Off Warnings**:
+  - 30 min: Dim to 40% + warm to 1800K (clear warning)
+  - 40 min: Dim to 20% + warm to 1800K (strong warning)
+  - 45 min: Turn off with 3-second fade
+- **Easy Override System** - Toggle via button/switch/input_boolean to keep lights on regardless of lux
+- **Philips Hue Compatible** - Color_temp mode (mireds)
+
+### Quick Start
+
+See [📖 Quick Start Guide](blueprints/INTELLIGENT_LIVING_ROOM_QUICK_START.md) for 5-minute setup.
+
+**Recommended Configuration:**
+```yaml
+lux_sensor: sensor.aqara_fp2_illuminance
+presence_sensor: binary_sensor.aqara_fp2_presence
+approach_sensor: binary_sensor.aqara_fp2_approach  # Optional
+override_entity: input_boolean.living_room_movie_mode
+lux_turn_off_threshold: 150
+lux_turn_on_threshold: 80
+```
+
+### Anti-Flicker Protection Explained
+
+**The Problem:** Natural light constantly fluctuates from clouds, reflections, and gradual sunrise/sunset. Without protection, lights flicker on/off annoyingly.
+
+**The Solution:**
+- **Hysteresis**: 50 lux gap between ON (80) and OFF (150) creates "dead band"
+- **Debouncing**: Light must be stable 5 minutes before turning off, 2 minutes before turning on
+- **Extended transitions**: 10-minute debounce during sunrise/sunset prevents oscillation
+
+Result: No flicker, smooth operation, natural feel.
+
+### Documentation
+
+- [📖 Quick Start](blueprints/INTELLIGENT_LIVING_ROOM_QUICK_START.md) - 5-minute setup
+- [📘 Complete Setup Guide](blueprints/INTELLIGENT_LIVING_ROOM_SETUP_GUIDE.md) - FP2 configuration, advanced features
+- [🔬 Anti-Flicker Technical Guide](blueprints/ANTI_FLICKER_TECHNICAL_GUIDE.md) - Deep dive into hysteresis logic
+- [📡 FP2 Features Reference](blueprints/FP2_FEATURES_REFERENCE.md) - Aqara FP2 capabilities
+
+### Future Enhancements (v1.1+)
+
+- Night Lights Mode (separate late-night settings)
+- Scene Integration (activate scenes instead of basic on/off)
+- Adaptive Lighting Detection (pause on manual changes)
+- Auto-Off Safety Timer (maximum on-time)
+- Multi-zone support (different FP2 zones)
+- Target count awareness (brighter with more people)
 
 ---
 
