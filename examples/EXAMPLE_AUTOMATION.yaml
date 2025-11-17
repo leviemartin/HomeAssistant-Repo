@@ -1,0 +1,223 @@
+# Example Automation Created from the Circadian Rhythm Lighting Blueprint
+# This is what a configured automation looks like after using the blueprint
+
+# Copy this file to: /config/automations.yaml (or use the UI to create it)
+
+- id: bedroom_circadian_lighting
+  alias: Bedroom - Circadian Rhythm Lighting
+  description: >
+    Automatically adjusts bedroom lights based on time of day when motion is detected.
+    Uses scientifically-backed color temperatures to support natural circadian rhythm.
+
+  use_blueprint:
+    path: circadian_rhythm_lighting.yaml
+    input:
+      # Required: Select your lights
+      target_lights:
+        entity_id:
+          - light.bedroom_ceiling
+          - light.bedside_lamp_left
+          - light.bedside_lamp_right
+
+      # Required: Select motion sensor(s)
+      motion_sensors:
+        - binary_sensor.bedroom_motion
+
+      # Optional: Light control settings
+      light_timeout: 300  # 5 minutes
+      adjust_brightness: true  # Also adjust brightness
+
+      # Optional: Lux sensor (prevents daytime activation)
+      lux_sensor: sensor.bedroom_illuminance
+      lux_threshold: 50  # Only activate if darker than 50 lux
+
+      # Optional: Customize time ranges (defaults shown below)
+      dawn_start: "05:00:00"
+      morning_start: "07:00:00"
+      midday_start: "10:00:00"
+      afternoon_start: "15:00:00"
+      evening_start: "18:00:00"
+      night_start: "21:00:00"
+
+---
+
+# Additional Example: Home Office (Productivity-Focused)
+
+- id: office_circadian_lighting
+  alias: Home Office - Circadian Lighting
+  description: Optimized for productivity with extended bright phases
+
+  use_blueprint:
+    path: circadian_rhythm_lighting.yaml
+    input:
+      target_lights:
+        entity_id:
+          - light.office_desk_lamp
+          - light.office_overhead
+
+      motion_sensors:
+        - binary_sensor.office_motion
+
+      light_timeout: 600  # 10 minutes (longer work sessions)
+      adjust_brightness: true
+
+      # No lux sensor - want light even during day
+
+      # Extended midday phase for work hours
+      dawn_start: "06:00:00"
+      morning_start: "08:00:00"
+      midday_start: "09:00:00"    # Start bright earlier
+      afternoon_start: "17:00:00"  # Keep bright longer
+      evening_start: "19:00:00"
+      night_start: "22:00:00"
+
+---
+
+# Additional Example: Bathroom (Quick Use)
+
+- id: bathroom_circadian_lighting
+  alias: Bathroom - Circadian Lighting
+  description: Quick activation with appropriate lighting for time of day
+
+  use_blueprint:
+    path: circadian_rhythm_lighting.yaml
+    input:
+      target_lights:
+        entity_id:
+          - light.bathroom_vanity
+          - light.bathroom_ceiling
+
+      motion_sensors:
+        - binary_sensor.bathroom_motion
+
+      light_timeout: 180  # 3 minutes (short visits)
+      adjust_brightness: true
+
+      # Use defaults for time ranges - they work well for bathrooms
+
+---
+
+# Additional Example: Hallway (Transitional Space)
+
+- id: hallway_circadian_lighting
+  alias: Hallway - Circadian Lighting
+  description: Brief activation when passing through
+
+  use_blueprint:
+    path: circadian_rhythm_lighting.yaml
+    input:
+      target_lights:
+        entity_id:
+          - light.hallway_1
+          - light.hallway_2
+          - light.hallway_3
+
+      motion_sensors:
+        - binary_sensor.hallway_motion_1
+        - binary_sensor.hallway_motion_2
+
+      light_timeout: 120  # 2 minutes (just passing through)
+      adjust_brightness: true
+
+      lux_sensor: sensor.hallway_illuminance
+      lux_threshold: 80  # Hallways are usually darker
+
+      # Use default time ranges
+
+---
+
+# Additional Example: Living Room (Relaxation-Focused)
+
+- id: living_room_circadian_lighting
+  alias: Living Room - Circadian Lighting
+  description: Extended warm phases for relaxation
+
+  use_blueprint:
+    path: circadian_rhythm_lighting.yaml
+    input:
+      target_lights:
+        area_id: living_room  # Can also select by area!
+
+      motion_sensors:
+        - binary_sensor.living_room_motion
+
+      light_timeout: 600  # 10 minutes (longer activities)
+      adjust_brightness: true
+
+      # Extended evening phase for relaxation
+      dawn_start: "05:00:00"
+      morning_start: "07:00:00"
+      midday_start: "11:00:00"
+      afternoon_start: "15:00:00"
+      evening_start: "17:00:00"   # Start warm earlier
+      night_start: "22:00:00"      # Later night phase
+
+---
+
+# Additional Example: Night Shift Worker
+
+- id: night_shift_circadian_lighting
+  alias: Night Shift - Circadian Lighting
+  description: Inverted schedule for night shift workers
+
+  use_blueprint:
+    path: circadian_rhythm_lighting.yaml
+    input:
+      target_lights:
+        entity_id:
+          - light.bedroom_ceiling
+
+      motion_sensors:
+        - binary_sensor.bedroom_motion
+
+      light_timeout: 300
+      adjust_brightness: true
+
+      # Inverted schedule (wake at 5pm, sleep at 9am)
+      dawn_start: "17:00:00"    # Wake up - warm
+      morning_start: "19:00:00"  # Getting ready - brighter
+      midday_start: "22:00:00"   # "Daytime" - bright and cool
+      afternoon_start: "03:00:00" # Night shift afternoon
+      evening_start: "06:00:00"   # Wind down
+      night_start: "09:00:00"     # Sleep time
+
+---
+
+# Notes:
+
+# 1. Entity Selection Methods:
+#    - Individual lights: entity_id: light.bedroom_ceiling
+#    - Multiple lights: entity_id: [light.one, light.two]
+#    - By area: area_id: bedroom
+#    - By device: device_id: abc123
+#    - Mix and match as needed
+
+# 2. Motion Sensors:
+#    - Single sensor: binary_sensor.bedroom_motion
+#    - Multiple sensors: [binary_sensor.one, binary_sensor.two]
+#    - Any sensor triggering "on" will activate lights
+
+# 3. Lux Sensor:
+#    - Leave empty to always trigger (no ambient light check)
+#    - Configure to prevent daytime activation
+
+# 4. Time Customization:
+#    - All times are in 24-hour format: "HH:MM:SS"
+#    - Customize for your schedule, room usage, or shift work
+
+# 5. Creating Automations:
+#    - UI Method (Recommended): Settings → Automations → Create → Use Blueprint
+#    - YAML Method: Copy examples above to automations.yaml
+#    - After editing automations.yaml, reload automations or restart HA
+
+# 6. Testing:
+#    - Trigger motion in the room
+#    - Verify correct color temperature for current time
+#    - Check automation traces in Settings → Automations → Click automation → Traces
+#    - Adjust settings based on your preferences
+
+# 7. Optimization:
+#    - Start with defaults
+#    - Run for a week
+#    - Note when colors feel "wrong" for your activity
+#    - Adjust phase boundaries to better match your routine

@@ -1,0 +1,258 @@
+blueprint:
+  name: Circadian Rhythm Lighting with Motion Control
+  description: >
+    Automatically adjusts light color temperature throughout the day to support your
+    natural circadian rhythm. Based on scientific research, this blueprint provides
+    six distinct phases that mimic natural daylight patterns - from warm sunrise tones
+    to energizing midday cool light, back to relaxing evening warmth.
+
+    Motion sensors trigger the lights to turn on with the appropriate color temperature
+    for the current time of day. Optional lux sensor integration prevents lights from
+    activating when there's sufficient natural light.
+
+    Scientifically-backed color temperature ranges:
+    - Dawn (5am-7am): 2000K - Soft warm light, gentle wake-up
+    - Morning (7am-10am): 3000K - Warm white, comfortable morning light
+    - Midday (10am-3pm): 5500K - Cool daylight, maximum alertness
+    - Afternoon (3pm-6pm): 4500K - Neutral white, sustained energy
+    - Evening (6pm-9pm): 3000K - Warm white, beginning wind-down
+    - Night (9pm-5am): 2200K - Extra warm/amber, minimal circadian disruption
+
+  domain: automation
+  source_url: https://github.com/yourusername/ha-blueprints/circadian-rhythm-lighting
+
+  input:
+    # === LIGHTS SECTION ===
+    target_lights:
+      name: Target Lights
+      description: >
+        Select the lights that should follow the circadian rhythm. These lights
+        MUST support color temperature adjustment (not just RGB). Most white ambiance
+        or tunable white bulbs will work.
+      selector:
+        target:
+          entity:
+            - domain: light
+
+    # === MOTION SENSORS SECTION ===
+    motion_sensors:
+      name: Motion Sensors
+      description: >
+        Select one or more motion sensors that will trigger the lights. When motion
+        is detected, lights will turn on with the appropriate color temperature for
+        the current time of day.
+      selector:
+        entity:
+          multiple: true
+          filter:
+            - domain: binary_sensor
+              device_class: motion
+
+    # === LIGHT CONTROL OPTIONS ===
+    light_timeout:
+      name: Light Timeout Duration
+      description: >
+        How long should the lights stay on after motion is no longer detected?
+      default: 300
+      selector:
+        number:
+          min: 30
+          max: 3600
+          step: 30
+          unit_of_measurement: seconds
+          mode: slider
+
+    adjust_brightness:
+      name: Adjust Brightness Throughout Day
+      description: >
+        Enable to also adjust brightness levels based on time of day (dimmer in
+        morning/evening, brighter during day). Disable to only adjust color temperature.
+      default: false
+      selector:
+        boolean:
+
+    # === OPTIONAL LUX SENSOR ===
+    lux_sensor:
+      name: Lux Sensor (Optional)
+      description: >
+        Optional: Select an illuminance sensor. When enabled, lights will only
+        activate if ambient light is below the threshold. Leave empty to always
+        trigger lights regardless of ambient light level.
+      default: {}
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              device_class: illuminance
+
+    lux_threshold:
+      name: Lux Threshold
+      description: >
+        Lights will only turn on if the lux sensor reads below this value.
+        Only applies if a lux sensor is selected above.
+      default: 100
+      selector:
+        number:
+          min: 0
+          max: 500
+          step: 10
+          unit_of_measurement: lux
+          mode: slider
+
+    # === CIRCADIAN TIMING CUSTOMIZATION ===
+    dawn_start:
+      name: Dawn Phase Start Time
+      description: When the dawn phase begins (warm sunrise tones, 2000K)
+      default: "05:00:00"
+      selector:
+        time:
+
+    morning_start:
+      name: Morning Phase Start Time
+      description: When the morning phase begins (warm white, 3000K)
+      default: "07:00:00"
+      selector:
+        time:
+
+    midday_start:
+      name: Midday Phase Start Time
+      description: When the midday phase begins (cool daylight, 5500K)
+      default: "10:00:00"
+      selector:
+        time:
+
+    afternoon_start:
+      name: Afternoon Phase Start Time
+      description: When the afternoon phase begins (neutral white, 4500K)
+      default: "15:00:00"
+      selector:
+        time:
+
+    evening_start:
+      name: Evening Phase Start Time
+      description: When the evening phase begins (warm white, 3000K)
+      default: "18:00:00"
+      selector:
+        time:
+
+    night_start:
+      name: Night Phase Start Time
+      description: When the night phase begins (extra warm/amber, 2200K)
+      default: "21:00:00"
+      selector:
+        time:
+
+# Mode set to restart so that if motion is detected again, the timer resets
+mode: restart
+max_exceeded: silent
+
+variables:
+  # Convert inputs to variables for easier reference
+  lux_sensor_entity: !input lux_sensor
+  lux_threshold_value: !input lux_threshold
+  brightness_adjustment: !input adjust_brightness
+
+  # Time boundaries for circadian phases
+  dawn_time: !input dawn_start
+  morning_time: !input morning_start
+  midday_time: !input midday_start
+  afternoon_time: !input afternoon_start
+  evening_time: !input evening_start
+  night_time: !input night_start
+
+  # Calculate current time as comparable value (total seconds since midnight)
+  current_time: "{{ now().hour * 3600 + now().minute * 60 + now().second }}"
+
+  # Convert time inputs to seconds for comparison
+  dawn_seconds: "{{ strptime(dawn_time, '%H:%M:%S').hour * 3600 + strptime(dawn_time, '%H:%M:%S').minute * 60 }}"
+  morning_seconds: "{{ strptime(morning_time, '%H:%M:%S').hour * 3600 + strptime(morning_time, '%H:%M:%S').minute * 60 }}"
+  midday_seconds: "{{ strptime(midday_time, '%H:%M:%S').hour * 3600 + strptime(midday_time, '%H:%M:%S').minute * 60 }}"
+  afternoon_seconds: "{{ strptime(afternoon_time, '%H:%M:%S').hour * 3600 + strptime(afternoon_time, '%H:%M:%S').minute * 60 }}"
+  evening_seconds: "{{ strptime(evening_time, '%H:%M:%S').hour * 3600 + strptime(evening_time, '%H:%M:%S').minute * 60 }}"
+  night_seconds: "{{ strptime(night_time, '%H:%M:%S').hour * 3600 + strptime(night_time, '%H:%M:%S').minute * 60 }}"
+
+  # Determine current circadian phase and set color temperature (in Kelvin)
+  # Night phase wraps around midnight, so we check it separately
+  color_temp_kelvin: >
+    {% if current_time|int >= night_seconds|int or current_time|int < dawn_seconds|int %}
+      2200
+    {% elif current_time|int >= dawn_seconds|int and current_time|int < morning_seconds|int %}
+      2000
+    {% elif current_time|int >= morning_seconds|int and current_time|int < midday_seconds|int %}
+      3000
+    {% elif current_time|int >= midday_seconds|int and current_time|int < afternoon_seconds|int %}
+      5500
+    {% elif current_time|int >= afternoon_seconds|int and current_time|int < evening_seconds|int %}
+      4500
+    {% else %}
+      3000
+    {% endif %}
+
+  # Convert Kelvin to mireds (some lights use mireds instead of Kelvin)
+  # Formula: mireds = 1,000,000 / kelvin
+  color_temp_mireds: "{{ (1000000 / color_temp_kelvin|int) | int }}"
+
+  # Brightness levels for each phase (only used if brightness adjustment is enabled)
+  brightness_percent: >
+    {% if current_time|int >= night_seconds|int or current_time|int < dawn_seconds|int %}
+      20
+    {% elif current_time|int >= dawn_seconds|int and current_time|int < morning_seconds|int %}
+      40
+    {% elif current_time|int >= morning_seconds|int and current_time|int < midday_seconds|int %}
+      70
+    {% elif current_time|int >= midday_seconds|int and current_time|int < afternoon_seconds|int %}
+      100
+    {% elif current_time|int >= afternoon_seconds|int and current_time|int < evening_seconds|int %}
+      80
+    {% else %}
+      50
+    {% endif %}
+
+trigger:
+  # Trigger when any of the selected motion sensors detect motion
+  - platform: state
+    entity_id: !input motion_sensors
+    to: "on"
+
+condition:
+  # Only proceed if lux sensor is not configured OR if lux is below threshold
+  - condition: template
+    value_template: >
+      {% if lux_sensor_entity %}
+        {{ states(lux_sensor_entity) | float(0) < lux_threshold_value }}
+      {% else %}
+        true
+      {% endif %}
+
+action:
+  # Turn on lights with appropriate circadian settings
+  - service: light.turn_on
+    target: !input target_lights
+    data:
+      # Use kelvin if the light supports it, otherwise fall back to color_temp (mireds)
+      # Both are provided for maximum compatibility across different light types
+      kelvin: "{{ color_temp_kelvin | int }}"
+      color_temp: "{{ color_temp_mireds | int }}"
+      # Conditionally set brightness only if adjustment is enabled
+      brightness_pct: >
+        {% if brightness_adjustment %}
+          {{ brightness_percent | int }}
+        {% endif %}
+      # Instant transition for phase boundaries as per user preference
+      transition: 0
+
+  # Wait for motion to clear
+  - wait_for_trigger:
+      - platform: state
+        entity_id: !input motion_sensors
+        to: "off"
+        for: !input light_timeout
+    timeout:
+      hours: 12
+    continue_on_timeout: false
+
+  # Turn off lights after timeout
+  - service: light.turn_off
+    target: !input target_lights
+    data:
+      transition: 2

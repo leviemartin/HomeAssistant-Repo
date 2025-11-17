@@ -1,0 +1,30 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Claude Code
+.claude/
+.claude.json
+.claude.json.backup
+
+# Home Assistant
+home-assistant.log
+home-assistant_v2.db
+.uuid
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Other
+untitled folder/
