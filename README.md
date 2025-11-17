@@ -129,6 +129,7 @@ See [`examples/EXAMPLE_AUTOMATION.yaml`](examples/EXAMPLE_AUTOMATION.yaml) for c
 - **Motion-Activated Brightness Boost**: Temporarily increases brightness for parent checks, then returns to base
 - **Smooth Transitions**: Gentle changes prevent startling sleeping children
 - **Age-Specific Recommendations**: Detailed guidance for ages 1-2, 2-3, 3-4, and 4-5
+- **Wide Compatibility**: Works with RGB lights (Third Reality, LIFX) and tunable white lights (Philips Hue, IKEA TRADFRI)
 
 ### Scientific Research Summary
 

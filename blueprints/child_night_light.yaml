@@ -20,7 +20,7 @@ blueprint:
     - Up to 3 configurable time slots (nighttime, nap 1, nap 2)
     - Optional motion-activated brightness boost with auto-return to base level
     - Smooth transitions to avoid startling children
-    - Compatible with Philips Hue and other tunable white lights
+    - Compatible with RGB lights (Third Reality) and tunable white lights (Philips Hue)
 
 
     Perfect for nurseries, children's bedrooms, and hallways leading to bathrooms.
@@ -33,9 +33,10 @@ blueprint:
     target_lights:
       name: Night Lights
       description: >
-        Select up to 4 lights to use as night lights. These lights MUST support
-        color temperature adjustment (tunable white or white ambiance bulbs).
-        For best results, use lights that support very low brightness levels.
+        Select up to 4 lights to use as night lights. Compatible with RGB lights
+        (Third Reality, LIFX Color) or tunable white/color temperature lights
+        (Philips Hue, IKEA TRADFRI). For best results, use lights that support
+        very low brightness levels.
       selector:
         target:
           entity:
@@ -246,10 +247,24 @@ variables:
   nap2_start_time: !input nap2_start
   nap2_end_time: !input nap2_end
 
-  # Convert Kelvin to mireds for Philips Hue compatibility
+  # Convert Kelvin to mireds for color temperature lights (e.g., Philips Hue)
   # Formula: mireds = 1,000,000 / kelvin
-  # CRITICAL: Never use both kelvin and color_temp in the same service call
   color_temp_mireds: "{{ (1000000 / color_temp_kelvin|int) | int }}"
+
+  # RGB values for warm amber colors (for RGB lights like Third Reality)
+  # These approximate the Kelvin values for lights that don't support color_temp
+  rgb_color_value: >
+    {% if color_temp_kelvin|int == 2000 %}
+      [255, 147, 41]
+    {% elif color_temp_kelvin|int == 2200 %}
+      [255, 160, 54]
+    {% elif color_temp_kelvin|int == 2500 %}
+      [255, 178, 75]
+    {% elif color_temp_kelvin|int == 2700 %}
+      [255, 192, 91]
+    {% else %}
+      [255, 147, 41]
+    {% endif %}
 
   # Calculate if we're currently in an active time slot
   # This is used by the trigger condition and time-based automation
@@ -342,11 +357,12 @@ action:
                     value_template: "{{ nap2_active }}"
         sequence:
           # Turn on lights with base nighttime settings (gentle fade-in)
+          # Supports both color_temp lights (Philips Hue) and RGB lights (Third Reality)
           - service: light.turn_on
             target: !input target_lights
             data:
               brightness_pct: "{{ base_brightness_pct }}"
-              color_temp: "{{ color_temp_mireds }}"
+              rgb_color: "{{ rgb_color_value }}"
               transition: "{{ transition_time }}"
 
       # === SCENARIO 2: Time slot ENDING (turn off lights) ===
@@ -390,11 +406,12 @@ action:
             value_template: "{{ currently_active }}"
         sequence:
           # Temporarily boost brightness for visibility (maintain warm color)
+          # Supports both color_temp lights (Philips Hue) and RGB lights (Third Reality)
           - service: light.turn_on
             target: !input target_lights
             data:
               brightness_pct: "{{ motion_brightness_pct }}"
-              color_temp: "{{ color_temp_mireds }}"
+              rgb_color: "{{ rgb_color_value }}"
               transition: "{{ transition_time }}"
 
           # Wait for motion to clear
@@ -413,11 +430,12 @@ action:
           - condition: template
             value_template: "{{ currently_active }}"
 
+          # Supports both color_temp lights (Philips Hue) and RGB lights (Third Reality)
           - service: light.turn_on
             target: !input target_lights
             data:
               brightness_pct: "{{ base_brightness_pct }}"
-              color_temp: "{{ color_temp_mireds }}"
+              rgb_color: "{{ rgb_color_value }}"
               transition: "{{ transition_time }}"
 
     # Default: Do nothing (shouldn't reach here, but safety fallback)
