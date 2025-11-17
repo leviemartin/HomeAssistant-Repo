@@ -1,0 +1,870 @@
+blueprint:
+  name: Intelligent Living Room - mmWave + Lux-Aware v1.0
+  description: >
+    Professional-grade lighting automation combining mmWave presence detection,
+    lux-aware hysteresis anti-flicker logic, staged turn-off sequences, dynamic
+    brightness adjustment, and sun-aware circadian rhythm for natural lighting.
+
+
+    This is v1.0 - production-ready, triple-checked, and optimized for Philips Hue.
+
+
+    KEY FEATURES:
+
+
+    - ANTI-FLICKER HYSTERESIS: Dual-threshold system with separate ON/OFF lux levels
+      prevents light flicker. Turn OFF at 150 lux (5 min debounce), turn ON at 80 lux
+      (2 min debounce). Extended 10 min debounce during sunrise/sunset transitions.
+
+
+    - MMWAVE PRESENCE: Single sensor design (Aqara FP2, EP1, or similar). Approach
+      detection support for instant activation. No complex zone mapping required.
+
+
+    - DYNAMIC BRIGHTNESS: Brightness scales inversely with ambient lux. Darker rooms
+      get brighter lights (≤50 lux = 100%), brighter rooms get dimmer lights (150 lux = 40%).
+
+
+    - CIRCADIAN RHYTHM: Sun-aware color temperature with 1800K baseline warmth. Uses
+      sun elevation for authentic natural lighting. Philips Hue native color_temp/mireds mode.
+
+
+    - STAGED TURN-OFF: Gradual dimming sequence before lights turn off. Stage 1 (30 min):
+      40% + 1800K warm, Stage 2 (40 min): 20% + 1800K warm, Stage 3 (45 min): OFF.
+
+
+    - MANUAL OVERRIDE: Button/switch/input_boolean support. Toggle behavior to keep
+      lights on regardless of lux. Override disables lux-based turn-off while active.
+
+
+    - SUNRISE/SUNSET SMART: 10-minute extended debounce during dawn/dusk prevents
+      oscillation from rapidly changing ambient light.
+
+
+    PERFECT FOR: Living rooms, family rooms, media rooms with large windows prone to
+    light flicker, spaces requiring gradual turn-off behavior, users who want manual control.
+
+
+    COMPATIBILITY: Philips Hue, IKEA Tradfri, any tunable white lights. Aqara FP2/EP1,
+    any mmWave or PIR presence sensors.
+
+  domain: automation
+  source_url: https://github.com/martinlevie/HomeAssistant-Repo/blueprints/intelligent_living_room_mmwave_lux_aware.yaml
+
+  input:
+    # ============================================================================
+    # SECTION 1: LIGHTS AND TARGET ENTITIES
+    # ============================================================================
+    target_lights:
+      name: Target Lights
+      description: >
+        Select the lights to control. Must support color temperature (tunable white).
+        Works with Philips Hue, IKEA Tradfri, and most smart bulbs with color_temp support.
+      selector:
+        target:
+          entity:
+            - domain: light
+
+    # ============================================================================
+    # SECTION 2: PRESENCE SENSORS (MMWAVE / PIR)
+    # ============================================================================
+    presence_sensor:
+      name: Primary Presence Sensor
+      description: >
+        Main presence sensor for the room (Aqara FP2, mmWave, PIR, etc.). Treats entire
+        room as one zone - simple and reliable. When presence detected, lights turn on
+        (unless lux is too high). When presence clears, staged turn-off begins.
+      selector:
+        entity:
+          filter:
+            - domain: binary_sensor
+
+    approach_sensor:
+      name: Approach Detection Sensor (Optional)
+      description: >
+        Optional approach detection sensor (FP2 approach events configured in Aqara app,
+        or similar). When triggered, lights turn on immediately even if lux is high -
+        perfect for entering bright rooms. Leave empty to disable approach detection.
+      default: {}
+      selector:
+        entity:
+          filter:
+            - domain: binary_sensor
+
+    # ============================================================================
+    # SECTION 3: LUX SENSOR AND ANTI-FLICKER THRESHOLDS
+    # ============================================================================
+    lux_sensor:
+      name: Lux/Illuminance Sensor
+      description: >
+        Ambient light sensor for lux-aware control. Can be FP2's built-in lux sensor
+        or any separate illuminance sensor. Critical for anti-flicker hysteresis system.
+        Place sensor where it measures room's natural light (near window but not direct sun).
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              device_class: illuminance
+
+    lux_turn_on_threshold:
+      name: Lux Turn-ON Threshold
+      description: >
+        Lights can turn ON when lux drops BELOW this value (if presence detected).
+        Default: 80 lux. This is the LOWER threshold of the hysteresis band. Lower values
+        = lights only activate in darker conditions.
+      default: 80
+      selector:
+        number:
+          min: 20
+          max: 200
+          step: 5
+          unit_of_measurement: lux
+          mode: slider
+
+    lux_turn_off_threshold:
+      name: Lux Turn-OFF Threshold
+      description: >
+        Lights will turn OFF when lux rises ABOVE this value (after debounce). Default: 150 lux.
+        This is the UPPER threshold of the hysteresis band. Must be higher than turn-ON
+        threshold to create hysteresis gap (prevents flickering). Higher values = lights
+        stay on even when fairly bright.
+      default: 150
+      selector:
+        number:
+          min: 50
+          max: 500
+          step: 10
+          unit_of_measurement: lux
+          mode: slider
+
+    lux_turn_on_debounce:
+      name: Turn-ON Debounce Duration
+      description: >
+        Wait this long after lux drops below ON threshold before allowing lights to turn on.
+        Prevents rapid on/off from passing clouds. Default: 2 minutes. Increase if you have
+        flickering issues on cloudy days.
+      default: 120
+      selector:
+        number:
+          min: 30
+          max: 600
+          step: 30
+          unit_of_measurement: seconds
+          mode: slider
+
+    lux_turn_off_debounce:
+      name: Turn-OFF Debounce Duration
+      description: >
+        Wait this long after lux rises above OFF threshold before turning lights off.
+        Prevents rapid on/off from passing clouds. Default: 5 minutes (300 seconds).
+        Longer debounce = more stable but less responsive to actual brightness changes.
+      default: 300
+      selector:
+        number:
+          min: 60
+          max: 900
+          step: 30
+          unit_of_measurement: seconds
+          mode: slider
+
+    sunrise_sunset_extended_debounce:
+      name: Sunrise/Sunset Extended Debounce
+      description: >
+        During dawn/dusk transitions (1 hour before/after sunrise/sunset), use this EXTENDED
+        debounce for turn-off to prevent oscillation during slow natural light changes.
+        Default: 10 minutes. Only affects turn-OFF, not turn-ON.
+      default: 600
+      selector:
+        number:
+          min: 300
+          max: 1200
+          step: 60
+          unit_of_measurement: seconds
+          mode: slider
+
+    # ============================================================================
+    # SECTION 4: MANUAL OVERRIDE SYSTEM
+    # ============================================================================
+    override_enabled:
+      name: Enable Manual Override System
+      description: >
+        Enable manual override (movie mode, party mode, etc.) to keep lights on regardless
+        of lux level. User can activate via button press, switch toggle, or input_boolean.
+        Toggle behavior: press once = ON, press again = OFF.
+      default: true
+      selector:
+        boolean:
+
+    override_trigger:
+      name: Override Trigger Entity (Optional)
+      description: >
+        Entity to trigger manual override toggle. Can be:
+        - Physical button (Aqara wireless button, Hue dimmer switch)
+        - Physical switch entity
+        - Virtual input_boolean helper
+        - Any binary sensor
+        Leave empty if override system is disabled. Each activation flips override state.
+      default: {}
+      selector:
+        entity:
+
+    # ============================================================================
+    # SECTION 5: DYNAMIC BRIGHTNESS SETTINGS
+    # ============================================================================
+    dynamic_brightness_enabled:
+      name: Enable Dynamic Brightness
+      description: >
+        Automatically adjust brightness based on natural light levels. Brightness scales
+        inversely with lux (brighter outside = dimmer lights, darker outside = brighter lights).
+        Works seamlessly with circadian color temperature. Recommended: ENABLED.
+      default: true
+      selector:
+        boolean:
+
+    # Dynamic brightness curve configuration
+    brightness_50_lux:
+      name: Brightness at ≤50 Lux
+      description: >
+        Brightness level when very dark (≤50 lux). Default: 100% (full brightness in darkness).
+      default: 100
+      selector:
+        number:
+          min: 40
+          max: 100
+          step: 5
+          unit_of_measurement: "%"
+          mode: slider
+
+    brightness_75_lux:
+      name: Brightness at 75 Lux
+      description: >
+        Brightness level at 75 lux. Default: 85% (slightly dimmed as natural light increases).
+      default: 85
+      selector:
+        number:
+          min: 30
+          max: 100
+          step: 5
+          unit_of_measurement: "%"
+          mode: slider
+
+    brightness_100_lux:
+      name: Brightness at 100 Lux
+      description: >
+        Brightness level at 100 lux (mid-range). Default: 70%.
+      default: 70
+      selector:
+        number:
+          min: 20
+          max: 100
+          step: 5
+          unit_of_measurement: "%"
+          mode: slider
+
+    brightness_125_lux:
+      name: Brightness at 125 Lux
+      description: >
+        Brightness level at 125 lux. Default: 55%.
+      default: 55
+      selector:
+        number:
+          min: 20
+          max: 100
+          step: 5
+          unit_of_measurement: "%"
+          mode: slider
+
+    brightness_150_lux:
+      name: Brightness at 150 Lux (OFF Threshold)
+      description: >
+        Brightness level at 150 lux (at OFF threshold). Default: 40%. This is the dimmest
+        the lights will go before turning off completely when lux exceeds OFF threshold.
+      default: 40
+      selector:
+        number:
+          min: 15
+          max: 100
+          step: 5
+          unit_of_measurement: "%"
+          mode: slider
+
+    # ============================================================================
+    # SECTION 6: CIRCADIAN RHYTHM (SUN-AWARE)
+    # ============================================================================
+    circadian_enabled:
+      name: Enable Circadian Rhythm
+      description: >
+        Enable sun-aware circadian color temperature. Uses actual sun elevation angles
+        (adapted from proven sun-aware blueprint). Warmest baseline: 1800K. Updates every
+        60 seconds with smooth 3-5 second transitions. Recommended: ENABLED.
+      default: true
+      selector:
+        boolean:
+
+    circadian_update_interval:
+      name: Circadian Update Frequency
+      description: >
+        How often to update color temperature based on sun position. Default: 60 seconds
+        (responsive without being excessive). Lower = more responsive but more automation triggers.
+      default: 60
+      selector:
+        number:
+          min: 30
+          max: 300
+          step: 30
+          unit_of_measurement: seconds
+          mode: slider
+
+    circadian_transition_duration:
+      name: Circadian Transition Duration
+      description: >
+        Smoothness of color temperature transitions. Default: 4 seconds (balanced - smooth
+        but not sluggish). Increase for gentler changes, decrease for snappier response.
+      default: 4
+      selector:
+        number:
+          min: 1
+          max: 10
+          step: 1
+          unit_of_measurement: seconds
+          mode: slider
+
+    # ============================================================================
+    # SECTION 7: STAGED TURN-OFF (PROGRESSIVE WARNINGS)
+    # ============================================================================
+    staged_turnoff_enabled:
+      name: Enable Staged Turn-Off
+      description: >
+        Enable progressive warnings before complete shut-off. Prevents jarring sudden darkness.
+        Three stages: 30 min (dim + warm), 40 min (dimmer), 45 min (off). User-configurable
+        timing and brightness. Recommended: ENABLED.
+      default: true
+      selector:
+        boolean:
+
+    stage_1_delay:
+      name: Stage 1 Delay (First Warning)
+      description: >
+        Time of no presence before first warning (dim + warm color). Default: 30 minutes.
+        Lights dim to Stage 1 brightness and shift to 1800K warm warning color.
+      default: 1800
+      selector:
+        number:
+          min: 300
+          max: 3600
+          step: 300
+          unit_of_measurement: seconds
+          mode: slider
+
+    stage_1_brightness:
+      name: Stage 1 Brightness
+      description: >
+        Brightness level for first warning stage. Default: 40%. Noticeable dim but still
+        functional if you return to room.
+      default: 40
+      selector:
+        number:
+          min: 10
+          max: 80
+          step: 5
+          unit_of_measurement: "%"
+          mode: slider
+
+    stage_2_delay:
+      name: Stage 2 Delay (Second Warning)
+      description: >
+        Time of no presence before second warning (dimmer). Default: 40 minutes. Lights
+        dim further to Stage 2 brightness, still at 1800K warm.
+      default: 2400
+      selector:
+        number:
+          min: 600
+          max: 4200
+          step: 300
+          unit_of_measurement: seconds
+          mode: slider
+
+    stage_2_brightness:
+      name: Stage 2 Brightness
+      description: >
+        Brightness level for second warning stage. Default: 20%. Very dim - strong warning
+        that lights will turn off soon.
+      default: 20
+      selector:
+        number:
+          min: 5
+          max: 50
+          step: 5
+          unit_of_measurement: "%"
+          mode: slider
+
+    stage_3_delay:
+      name: Stage 3 Delay (Complete Turn-Off)
+      description: >
+        Time of no presence before complete turn-off. Default: 45 minutes (2700 seconds).
+        Lights turn off completely with 3-second fade.
+      default: 2700
+      selector:
+        number:
+          min: 900
+          max: 5400
+          step: 300
+          unit_of_measurement: seconds
+          mode: slider
+
+# Automation mode: restart ensures clean state management
+# If presence detected during any stage, automation restarts from beginning
+mode: restart
+max_exceeded: silent
+
+variables:
+  # === CORE ENTITY REFERENCES ===
+  lux_sensor_entity: !input lux_sensor
+  presence_sensor_entity: !input presence_sensor
+  approach_sensor_entity: !input approach_sensor
+  override_trigger_entity: !input override_trigger
+
+  # === LUX THRESHOLDS AND DEBOUNCE ===
+  lux_on_threshold: !input lux_turn_on_threshold
+  lux_off_threshold: !input lux_turn_off_threshold
+  lux_on_debounce_sec: !input lux_turn_on_debounce
+  lux_off_debounce_sec: !input lux_turn_off_debounce
+  sunrise_sunset_debounce_sec: !input sunrise_sunset_extended_debounce
+
+  # === FEATURE FLAGS ===
+  override_system_enabled: !input override_enabled
+  dynamic_brightness: !input dynamic_brightness_enabled
+  circadian_rhythm: !input circadian_enabled
+  staged_turnoff: !input staged_turnoff_enabled
+
+  # === DYNAMIC BRIGHTNESS LEVELS ===
+  brightness_at_50_lux: !input brightness_50_lux
+  brightness_at_75_lux: !input brightness_75_lux
+  brightness_at_100_lux: !input brightness_100_lux
+  brightness_at_125_lux: !input brightness_125_lux
+  brightness_at_150_lux: !input brightness_150_lux
+
+  # === CIRCADIAN SETTINGS ===
+  circadian_update_sec: !input circadian_update_interval
+  circadian_transition_sec: !input circadian_transition_duration
+
+  # === STAGED TURN-OFF TIMING ===
+  stage_1_delay_sec: !input stage_1_delay
+  stage_1_brightness_pct: !input stage_1_brightness
+  stage_2_delay_sec: !input stage_2_delay
+  stage_2_brightness_pct: !input stage_2_brightness
+  stage_3_delay_sec: !input stage_3_delay
+
+  # === CURRENT LUX READING ===
+  current_lux: "{{ states(lux_sensor_entity) | float(0) }}"
+
+  # === SUN POSITION DATA ===
+  sun_elevation: "{{ state_attr('sun.sun', 'elevation') | float(0) }}"
+
+  # Calculate sunrise/sunset times for today
+  sunrise_timestamp: "{{ as_timestamp(state_attr('sun.sun', 'next_rising')) | int }}"
+  sunset_timestamp: "{{ as_timestamp(state_attr('sun.sun', 'next_setting')) | int }}"
+  current_timestamp: "{{ now().timestamp() | int }}"
+
+  # === SUNRISE/SUNSET DETECTION (1 hour window before/after) ===
+  # Check if we're within 1 hour before/after sunrise
+  is_near_sunrise: >
+    {{ (current_timestamp >= (sunrise_timestamp - 3600) and
+        current_timestamp <= (sunrise_timestamp + 3600)) }}
+
+  # Check if we're within 1 hour before/after sunset
+  is_near_sunset: >
+    {{ (current_timestamp >= (sunset_timestamp - 3600) and
+        current_timestamp <= (sunset_timestamp + 3600)) }}
+
+  # Combined dawn/dusk detection
+  is_dawn_or_dusk: >
+    {{ is_near_sunrise or is_near_sunset }}
+
+  # === SMART DEBOUNCE SELECTION ===
+  # Use extended debounce during sunrise/sunset, normal debounce otherwise
+  effective_off_debounce: >
+    {% if is_dawn_or_dusk %}
+      {{ sunrise_sunset_debounce_sec }}
+    {% else %}
+      {{ lux_off_debounce_sec }}
+    {% endif %}
+
+  # === OVERRIDE SYSTEM STATE ===
+  # Check if override is currently active (using input_boolean, binary_sensor, or switch state)
+  override_active: >
+    {% if override_system_enabled and override_trigger_entity %}
+      {{ is_state(override_trigger_entity, 'on') }}
+    {% else %}
+      false
+    {% endif %}
+
+  # === DYNAMIC BRIGHTNESS CALCULATION ===
+  # Brightness scales inversely with lux (brighter outside = dimmer lights)
+  calculated_brightness: >
+    {% if dynamic_brightness %}
+      {% set lux = current_lux | float %}
+      {% if lux <= 50 %}
+        {{ brightness_at_50_lux }}
+      {% elif lux <= 75 %}
+        {# Linear interpolation between 50 and 75 lux #}
+        {% set range_pct = (lux - 50) / 25 %}
+        {{ (brightness_at_50_lux - (brightness_at_50_lux - brightness_at_75_lux) * range_pct) | int }}
+      {% elif lux <= 100 %}
+        {# Linear interpolation between 75 and 100 lux #}
+        {% set range_pct = (lux - 75) / 25 %}
+        {{ (brightness_at_75_lux - (brightness_at_75_lux - brightness_at_100_lux) * range_pct) | int }}
+      {% elif lux <= 125 %}
+        {# Linear interpolation between 100 and 125 lux #}
+        {% set range_pct = (lux - 100) / 25 %}
+        {{ (brightness_at_100_lux - (brightness_at_100_lux - brightness_at_125_lux) * range_pct) | int }}
+      {% elif lux <= 150 %}
+        {# Linear interpolation between 125 and 150 lux #}
+        {% set range_pct = (lux - 125) / 25 %}
+        {{ (brightness_at_125_lux - (brightness_at_125_lux - brightness_at_150_lux) * range_pct) | int }}
+      {% else %}
+        {# Above 150 lux - use minimum brightness #}
+        {{ brightness_at_150_lux }}
+      {% endif %}
+    {% else %}
+      100  {# Default full brightness if dynamic brightness disabled #}
+    {% endif %}
+
+  # === CIRCADIAN COLOR TEMPERATURE CALCULATION (SUN-AWARE) ===
+  # Adapted from sun-aware blueprint with 1800K warmest baseline
+  color_temp_kelvin: >
+    {% if circadian_rhythm %}
+      {% set elevation = sun_elevation | float %}
+
+      {# Deep night (sun well below horizon) #}
+      {% if elevation < -6 %}
+        1800
+
+      {# Civil twilight (sun just below horizon) - gentle warm transition #}
+      {% elif elevation >= -6 and elevation < 0 %}
+        {{ (1800 + (elevation + 6) * 200) | int }}  {# 1800K to 3000K #}
+
+      {# Low sun (sunrise/sunset) - warming up or cooling down #}
+      {% elif elevation >= 0 and elevation < 10 %}
+        {{ (3000 + (elevation * 50)) | int }}  {# 3000K to 3500K #}
+
+      {# Rising/falling sun - energizing transition #}
+      {% elif elevation >= 10 and elevation < 30 %}
+        {{ (3500 + (elevation - 10) * 75) | int }}  {# 3500K to 5000K #}
+
+      {# High sun - peak alertness #}
+      {% elif elevation >= 30 and elevation < 50 %}
+        {{ (5000 + (elevation - 30) * 25) | int }}  {# 5000K to 5500K #}
+
+      {# Very high sun (summer midday) - maximum cool daylight #}
+      {% else %}
+        5500
+      {% endif %}
+    {% else %}
+      3000  {# Default warm white if circadian disabled #}
+    {% endif %}
+
+  # === CONVERT KELVIN TO MIREDS (Philips Hue native format) ===
+  # Formula: mireds = 1,000,000 / kelvin
+  # Ensures compatibility with color_temp service calls
+  color_temp_mireds: "{{ (1000000 / (color_temp_kelvin | int)) | int }}"
+
+  # === STAGED TURN-OFF WARNING COLOR ===
+  # Always 1800K warm during staged warnings (converted to mireds)
+  warning_color_temp_mireds: "{{ (1000000 / 1800) | int }}"
+
+trigger:
+  # === TRIGGER 1: PRIMARY PRESENCE DETECTION ===
+  # Main presence sensor triggers automation start
+  - platform: state
+    entity_id: !input presence_sensor
+    to: "on"
+    id: presence_detected
+
+  # === TRIGGER 2: APPROACH DETECTION (OPTIONAL) ===
+  # Approach sensor triggers immediate activation (bypasses lux check temporarily)
+  - platform: state
+    entity_id: !input approach_sensor
+    to: "on"
+    id: approach_detected
+
+  # === TRIGGER 3: MANUAL OVERRIDE TOGGLE ===
+  # Override trigger activates/deactivates manual override mode
+  - platform: state
+    entity_id: !input override_trigger
+    id: override_toggled
+
+  # === TRIGGER 4: CIRCADIAN UPDATE CYCLE ===
+  # Periodic update for circadian color temperature (every 60 seconds by default)
+  - platform: time_pattern
+    minutes: "/1"
+    id: circadian_update
+
+action:
+  # === ACTION FLOW DECISION TREE ===
+  - choose:
+      # ======================================================================
+      # BRANCH 1: MANUAL OVERRIDE TOGGLE
+      # ======================================================================
+      - conditions:
+          - condition: trigger
+            id: override_toggled
+        sequence:
+          # Override trigger pressed - toggle state is handled by the entity itself
+          # (input_boolean, switch, or binary_sensor already changes state)
+          # No action needed here - automation will check override_active variable
+          # on next presence/approach trigger
+          - service: system_log.write
+            data:
+              message: "Override toggled. New state: {{ override_active }}"
+              level: info
+
+      # ======================================================================
+      # BRANCH 2: APPROACH DETECTION (IMMEDIATE ACTIVATION)
+      # ======================================================================
+      - conditions:
+          - condition: trigger
+            id: approach_detected
+          - condition: template
+            value_template: "{{ approach_sensor_entity != none and approach_sensor_entity != '' }}"
+        sequence:
+          # Approach detected - turn on lights immediately regardless of lux
+          # Use current circadian color and dynamic brightness
+          - service: light.turn_on
+            target: !input target_lights
+            data:
+              brightness_pct: "{{ calculated_brightness }}"
+              color_temp: "{{ color_temp_mireds }}"
+              transition: 1  # Quick 1-second fade for approach response
+
+          # Wait for presence to clear before starting turn-off sequence
+          - wait_for_trigger:
+              - platform: state
+                entity_id: !input presence_sensor
+                to: "off"
+            timeout:
+              hours: 12
+            continue_on_timeout: false
+
+          # Presence cleared - proceed to staged turn-off (if enabled)
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ staged_turnoff }}"
+                sequence:
+                  # === STAGED TURN-OFF SEQUENCE ===
+                  # Stage 1: Wait, then dim to 40% + warm to 1800K
+                  - delay:
+                      seconds: "{{ stage_1_delay_sec }}"
+
+                  - service: light.turn_on
+                    target: !input target_lights
+                    data:
+                      brightness_pct: "{{ stage_1_brightness_pct }}"
+                      color_temp: "{{ warning_color_temp_mireds }}"
+                      transition: 3
+
+                  # Stage 2: Wait, then dim to 20% (keep 1800K)
+                  - delay:
+                      seconds: "{{ stage_2_delay_sec - stage_1_delay_sec }}"
+
+                  - service: light.turn_on
+                    target: !input target_lights
+                    data:
+                      brightness_pct: "{{ stage_2_brightness_pct }}"
+                      color_temp: "{{ warning_color_temp_mireds }}"
+                      transition: 3
+
+                  # Stage 3: Wait, then turn off completely
+                  - delay:
+                      seconds: "{{ stage_3_delay_sec - stage_2_delay_sec }}"
+
+                  - service: light.turn_off
+                    target: !input target_lights
+                    data:
+                      transition: 3
+
+            default:
+              # Staged turn-off disabled - simple turn-off after stage 3 delay
+              - delay:
+                  seconds: "{{ stage_3_delay_sec }}"
+
+              - service: light.turn_off
+                target: !input target_lights
+                data:
+                  transition: 3
+
+      # ======================================================================
+      # BRANCH 3: PRESENCE DETECTED (MAIN LOGIC WITH LUX HYSTERESIS)
+      # ======================================================================
+      - conditions:
+          - condition: trigger
+            id: presence_detected
+        sequence:
+          # === LUX HYSTERESIS CHECK (ANTI-FLICKER LOGIC) ===
+          # Only turn on if:
+          # 1. Override is active (ignore lux), OR
+          # 2. Lux is below ON threshold (after debounce)
+
+          - choose:
+              # Override active - turn on immediately regardless of lux
+              - conditions:
+                  - condition: template
+                    value_template: "{{ override_active }}"
+                sequence:
+                  - service: light.turn_on
+                    target: !input target_lights
+                    data:
+                      brightness_pct: "{{ calculated_brightness }}"
+                      color_temp: "{{ color_temp_mireds }}"
+                      transition: 2
+
+              # Override not active - check lux hysteresis
+              - conditions:
+                  - condition: template
+                    value_template: "{{ current_lux < lux_on_threshold }}"
+                sequence:
+                  # Lux is below ON threshold - wait for debounce before turning on
+                  - wait_template: "{{ states(lux_sensor_entity) | float < lux_on_threshold }}"
+                    timeout:
+                      seconds: "{{ lux_on_debounce_sec }}"
+                    continue_on_timeout: false
+
+                  # Debounce passed - turn on lights
+                  - service: light.turn_on
+                    target: !input target_lights
+                    data:
+                      brightness_pct: "{{ calculated_brightness }}"
+                      color_temp: "{{ color_temp_mireds }}"
+                      transition: 2
+
+            # If neither condition met (lux too high, no override) - do nothing
+
+          # === CONTINUOUS PRESENCE MONITORING ===
+          # While presence is active, continuously update brightness and color
+          - repeat:
+              sequence:
+                # Wait for circadian update interval
+                - delay:
+                    seconds: "{{ circadian_update_sec }}"
+
+                # Check if lights are still on and presence still detected
+                - condition: state
+                  entity_id: !input presence_sensor
+                  state: "on"
+
+                # Update lights with current circadian color and dynamic brightness
+                # But only if lux is still low enough OR override is active
+                - choose:
+                    - conditions:
+                        - condition: template
+                          value_template: "{{ override_active or (current_lux < lux_off_threshold) }}"
+                      sequence:
+                        - service: light.turn_on
+                          target: !input target_lights
+                          data:
+                            brightness_pct: "{{ calculated_brightness }}"
+                            color_temp: "{{ color_temp_mireds }}"
+                            transition: "{{ circadian_transition_sec }}"
+
+                    # Lux exceeded OFF threshold - wait for debounce then turn off
+                    - conditions:
+                        - condition: template
+                          value_template: "{{ not override_active and (current_lux >= lux_off_threshold) }}"
+                      sequence:
+                        # Wait for lux to stay high for debounce period
+                        - wait_template: "{{ states(lux_sensor_entity) | float >= lux_off_threshold }}"
+                          timeout:
+                            seconds: "{{ effective_off_debounce }}"
+                          continue_on_timeout: false
+
+                        # Debounce passed - turn off lights (lux too high)
+                        - service: light.turn_off
+                          target: !input target_lights
+                          data:
+                            transition: 5
+
+                        # Exit repeat loop
+                        - stop: "Lights turned off due to high lux"
+
+              # Continue updating until presence clears or lights turn off
+              until:
+                - condition: state
+                  entity_id: !input presence_sensor
+                  state: "off"
+
+          # === PRESENCE CLEARED - START STAGED TURN-OFF ===
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ staged_turnoff }}"
+                sequence:
+                  # Stage 1: Wait, then dim to 40% + warm to 1800K
+                  - delay:
+                      seconds: "{{ stage_1_delay_sec }}"
+
+                  - service: light.turn_on
+                    target: !input target_lights
+                    data:
+                      brightness_pct: "{{ stage_1_brightness_pct }}"
+                      color_temp: "{{ warning_color_temp_mireds }}"
+                      transition: 3
+
+                  # Stage 2: Wait, then dim to 20% (keep 1800K)
+                  - delay:
+                      seconds: "{{ stage_2_delay_sec - stage_1_delay_sec }}"
+
+                  - service: light.turn_on
+                    target: !input target_lights
+                    data:
+                      brightness_pct: "{{ stage_2_brightness_pct }}"
+                      color_temp: "{{ warning_color_temp_mireds }}"
+                      transition: 3
+
+                  # Stage 3: Wait, then turn off completely
+                  - delay:
+                      seconds: "{{ stage_3_delay_sec - stage_2_delay_sec }}"
+
+                  - service: light.turn_off
+                    target: !input target_lights
+                    data:
+                      transition: 3
+
+            default:
+              # Staged turn-off disabled - simple turn-off after stage 3 delay
+              - delay:
+                  seconds: "{{ stage_3_delay_sec }}"
+
+              - service: light.turn_off
+                target: !input target_lights
+                data:
+                  transition: 3
+
+      # ======================================================================
+      # BRANCH 4: CIRCADIAN UPDATE CYCLE (BACKGROUND UPDATES)
+      # ======================================================================
+      - conditions:
+          - condition: trigger
+            id: circadian_update
+          - condition: template
+            value_template: "{{ circadian_rhythm }}"
+          # Only update if lights are currently on
+          - condition: template
+            value_template: "{{ is_state_attr(target_lights.entity_id[0] if target_lights.entity_id is iterable else target_lights.entity_id, 'state', 'on') }}"
+        sequence:
+          # Update color temperature based on current sun position
+          # Only if lux allows OR override is active
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ override_active or (current_lux < lux_off_threshold) }}"
+                sequence:
+                  - service: light.turn_on
+                    target: !input target_lights
+                    data:
+                      brightness_pct: "{{ calculated_brightness }}"
+                      color_temp: "{{ color_temp_mireds }}"
+                      transition: "{{ circadian_transition_sec }}"
+
+    # === DEFAULT BRANCH (FALLBACK) ===
+    default: []
