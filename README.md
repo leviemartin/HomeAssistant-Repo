@@ -33,7 +33,7 @@ A scientifically-backed Home Assistant blueprint that automatically adjusts your
 2. Click the **Import Blueprint** button
 3. Paste this URL:
    ```
-   https://github.com/leviemartin/HomeAssistant-Repo/blob/main/blueprints/circadian_rhythm_lighting.yaml
+   https://raw.githubusercontent.com/leviemartin/HomeAssistant-Repo/main/blueprints/circadian_rhythm_lighting.yaml
    ```
 4. Click **Preview** then **Import**
 
