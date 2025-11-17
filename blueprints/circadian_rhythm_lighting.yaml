@@ -7,8 +7,12 @@ blueprint:
     to energizing midday cool light, back to relaxing evening warmth.
 
     Motion sensors trigger the lights to turn on with the appropriate color temperature
-    for the current time of day. Optional lux sensor integration prevents lights from
-    activating when there's sufficient natural light.
+    for the current time of day with a pleasant smooth fade-in. When motion stops, lights
+    dim to a low level as a gentle warning before turning off completely, giving you time
+    to re-trigger the sensor if needed (inspired by Lutron Maestro switches).
+
+    Optional lux sensor integration prevents lights from activating when there's
+    sufficient natural light.
 
     Scientifically-backed color temperature ranges:
     - Dawn (5am-7am): 2000K - Soft warm light, gentle wake-up
@@ -70,6 +74,44 @@ blueprint:
       default: false
       selector:
         boolean:
+
+    dim_warning_enabled:
+      name: Enable Dim Warning Before Turn Off
+      description: >
+        When enabled, lights will dim to a low level as a warning before turning off
+        completely. This gives you time to move and re-trigger the motion sensor if needed.
+        Inspired by Lutron Maestro switches for a more considerate lighting experience.
+      default: true
+      selector:
+        boolean:
+
+    dim_warning_brightness:
+      name: Dim Warning Brightness Level
+      description: >
+        Brightness level for the warning dim (only used if dim warning is enabled).
+        Typical range is 10-20% for a noticeable but not jarring warning.
+      default: 15
+      selector:
+        number:
+          min: 5
+          max: 30
+          step: 5
+          unit_of_measurement: "%"
+          mode: slider
+
+    dim_warning_duration:
+      name: Dim Warning Duration
+      description: >
+        How long should the lights stay dimmed before turning off completely?
+        This gives you time to move and re-trigger the motion sensor.
+      default: 15
+      selector:
+        number:
+          min: 5
+          max: 60
+          step: 5
+          unit_of_measurement: seconds
+          mode: slider
 
     # === OPTIONAL LUX SENSOR ===
     lux_sensor:
@@ -151,6 +193,9 @@ variables:
   lux_sensor_entity: !input lux_sensor
   lux_threshold_value: !input lux_threshold
   brightness_adjustment: !input adjust_brightness
+  dim_warning: !input dim_warning_enabled
+  dim_brightness: !input dim_warning_brightness
+  dim_duration: !input dim_warning_duration
 
   # Time boundaries for circadian phases
   dawn_time: !input dawn_start
@@ -225,13 +270,13 @@ condition:
       {% endif %}
 
 action:
-  # Turn on lights with appropriate circadian settings
+  # Turn on lights with appropriate circadian settings (smooth 1.5 second fade-in)
   - service: light.turn_on
     target: !input target_lights
     data: >
       {% set data = {
         'color_temp': color_temp_mireds | int,
-        'transition': 0
+        'transition': 1.5
       } %}
       {% if brightness_adjustment %}
         {% set data = dict(data, brightness_pct=brightness_percent | int) %}
@@ -248,8 +293,32 @@ action:
       hours: 12
     continue_on_timeout: false
 
-  # Turn off lights after timeout
-  - service: light.turn_off
-    target: !input target_lights
-    data:
-      transition: 2
+  # Considerate turn-off: Dim as warning first, then turn off
+  - choose:
+      # If dim warning is enabled, do two-step turn-off
+      - conditions:
+          - condition: template
+            value_template: "{{ dim_warning }}"
+        sequence:
+          # Step 1: Dim to warning brightness with 2 second transition
+          - service: light.turn_on
+            target: !input target_lights
+            data:
+              brightness_pct: "{{ dim_brightness }}"
+              transition: 2
+
+          # Step 2: Wait while dimmed (gives user time to re-trigger motion)
+          - delay:
+              seconds: "{{ dim_duration }}"
+
+          # Step 3: Turn off completely with 3 second fade
+          - service: light.turn_off
+            target: !input target_lights
+            data:
+              transition: 3
+    # If dim warning is disabled, just turn off smoothly
+    default:
+      - service: light.turn_off
+        target: !input target_lights
+        data:
+          transition: 2
