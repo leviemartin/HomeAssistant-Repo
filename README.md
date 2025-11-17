@@ -6,10 +6,15 @@ A scientifically-backed Home Assistant blueprint that automatically adjusts your
 
 - **6 Scientifically-Backed Circadian Phases** - From warm 2000K sunrise to cool 5500K midday
 - **Motion-Activated** - Lights respond to motion sensors with configurable timeout
+- **Pleasant Smooth Transitions** - Lights fade in over 1.5 seconds (not jarring instant-on)
+- **Considerate Turn-Off** - Dim warning before turning off (inspired by Lutron Maestro)
+  - Dims to 15% as gentle warning
+  - Waits 15 seconds (time to re-trigger motion)
+  - Fades off smoothly over 3 seconds
 - **Lux Sensor Support** - Optional ambient light detection to prevent daytime activation
 - **Brightness Control** - Optional automatic brightness adjustment (20% night to 100% midday)
 - **Fully Customizable** - Adjust all time ranges and settings to match your schedule
-- **Maximum Compatibility** - Supports both Kelvin and Mireds color temperature formats
+- **Optimized for Philips Hue** - Uses mireds color temperature for maximum compatibility
 - **User-Friendly** - Simple dropdown selectors, no YAML editing required
 
 ## Color Temperature Schedule
