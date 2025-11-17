@@ -228,18 +228,15 @@ action:
   # Turn on lights with appropriate circadian settings
   - service: light.turn_on
     target: !input target_lights
-    data:
-      # Use kelvin if the light supports it, otherwise fall back to color_temp (mireds)
-      # Both are provided for maximum compatibility across different light types
-      kelvin: "{{ color_temp_kelvin | int }}"
-      color_temp: "{{ color_temp_mireds | int }}"
-      # Conditionally set brightness only if adjustment is enabled
-      brightness_pct: >
-        {% if brightness_adjustment %}
-          {{ brightness_percent | int }}
-        {% endif %}
-      # Instant transition for phase boundaries as per user preference
-      transition: 0
+    data: >
+      {% set data = {
+        'color_temp': color_temp_mireds | int,
+        'transition': 0
+      } %}
+      {% if brightness_adjustment %}
+        {% set data = dict(data, brightness_pct=brightness_percent | int) %}
+      {% endif %}
+      {{ data }}
 
   # Wait for motion to clear
   - wait_for_trigger:
