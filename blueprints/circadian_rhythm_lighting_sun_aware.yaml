@@ -1,0 +1,696 @@
+blueprint:
+  name: Sun-Aware Circadian Rhythm Lighting with Motion Control
+  description: >
+    Automatically adjusts light color temperature throughout the day to support your
+    natural circadian rhythm, with intelligent sun-tracking capabilities for locations
+    with extreme seasonal daylight variations (like the Netherlands).
+
+
+    This enhanced blueprint combines scientific circadian lighting principles with
+    sun position awareness, creating a hybrid system that:
+
+    - Tracks the sun's elevation during daytime hours for authentic natural lighting
+
+    - Respects fixed social schedules (bedtimes, morning routines) when needed
+
+    - Handles extreme seasonal variations (summer: 5:30am-10pm daylight, winter: 8:45am-4:30pm)
+
+    - Uses configurable min/max time limits to prevent unreasonable schedules
+
+    - Integrates lux sensors for context-aware evening decisions
+
+
+    Motion sensors trigger the lights to turn on with the appropriate color temperature
+    for the current sun position and time of day with a pleasant smooth fade-in. When
+    motion stops, lights dim to a low level as a gentle warning before turning off
+    completely, giving you time to re-trigger the sensor if needed.
+
+
+    SUN-AWARE FEATURES:
+
+    - Follow sun elevation angles during day (authentic circadian mimicry)
+
+    - Smart hybrid evening mode (sun + social rhythm balance)
+
+    - Bedtime overrides for kids/parents regardless of sun position
+
+    - Configurable time boundaries prevent extreme schedules
+
+    - Optional: Use traditional fixed-time mode for consistency
+
+
+    Scientifically-backed color temperature ranges:
+
+    - Night (deep sleep): 2000-2200K - Minimal circadian disruption
+
+    - Dawn/Dusk (civil twilight): 2500-3000K - Gentle transitions
+
+    - Morning (sun rising): 3000-4000K - Energizing warmth
+
+    - Midday (high sun): 5000-5500K - Maximum alertness
+
+    - Afternoon (sun falling): 4000-4500K - Sustained focus
+
+    - Evening (social time): 2700-3000K - Wind-down warmth
+
+  domain: automation
+  source_url: https://github.com/yourusername/ha-blueprints/circadian-rhythm-lighting-sun-aware
+
+  input:
+    # === LIGHTS SECTION ===
+    target_lights:
+      name: Target Lights
+      description: >
+        Select the lights that should follow the circadian rhythm. These lights
+        MUST support color temperature adjustment. Most white ambiance or tunable
+        white bulbs will work (including Philips Hue).
+      selector:
+        target:
+          entity:
+            - domain: light
+
+    # === MOTION SENSORS SECTION ===
+    motion_sensors:
+      name: Motion Sensors
+      description: >
+        Select one or more motion sensors that will trigger the lights. When motion
+        is detected, lights will turn on with the appropriate color temperature for
+        the current sun position and time of day.
+      selector:
+        entity:
+          multiple: true
+          filter:
+            - domain: binary_sensor
+              device_class: motion
+
+    # === SUN-TRACKING MODE SECTION ===
+    sun_tracking_enabled:
+      name: Enable Sun-Aware Tracking
+      description: >
+        NEW! Enable intelligent sun position tracking for authentic circadian lighting.
+        When enabled, the system uses the sun's elevation angle during daytime hours
+        to calculate optimal color temperature. When disabled, uses traditional fixed
+        time-based schedules. Perfect for locations with extreme seasonal variations
+        like the Netherlands.
+      default: true
+      selector:
+        boolean:
+
+    sun_tracking_mode:
+      name: Sun Tracking Mode
+      description: >
+        Choose how aggressively to follow the sun's position:
+
+        - HYBRID (Recommended): Sun-aware during day, fixed schedule for evening/bedtime
+
+        - FULL SUN: Always follow sun elevation (may conflict with bedtimes)
+
+        - CONSERVATIVE: Use sun hints but enforce strict time boundaries
+      default: hybrid
+      selector:
+        select:
+          options:
+            - label: "Hybrid (Sun + Social Schedule)"
+              value: "hybrid"
+            - label: "Full Sun Tracking"
+              value: "full_sun"
+            - label: "Conservative (Strict Limits)"
+              value: "conservative"
+
+    # === LIGHT CONTROL OPTIONS ===
+    light_timeout:
+      name: Light Timeout Duration
+      description: >
+        How long should the lights stay on after motion is no longer detected?
+      default: 300
+      selector:
+        number:
+          min: 30
+          max: 3600
+          step: 30
+          unit_of_measurement: seconds
+          mode: slider
+
+    adjust_brightness:
+      name: Adjust Brightness Throughout Day
+      description: >
+        Enable to also adjust brightness levels based on time/sun position (dimmer
+        in morning/evening, brighter during day). Disable to only adjust color temperature.
+      default: false
+      selector:
+        boolean:
+
+    dim_warning_enabled:
+      name: Enable Dim Warning Before Turn Off
+      description: >
+        When enabled, lights will dim to a low level as a warning before turning off
+        completely. This gives you time to move and re-trigger the motion sensor if needed.
+        Inspired by Lutron Maestro switches for a more considerate lighting experience.
+      default: true
+      selector:
+        boolean:
+
+    dim_warning_brightness:
+      name: Dim Warning Brightness Level
+      description: >
+        Brightness level for the warning dim (only used if dim warning is enabled).
+        Typical range is 10-20% for a noticeable but not jarring warning.
+      default: 15
+      selector:
+        number:
+          min: 5
+          max: 30
+          step: 5
+          unit_of_measurement: "%"
+          mode: slider
+
+    dim_warning_duration:
+      name: Dim Warning Duration
+      description: >
+        How long should the lights stay dimmed before turning off completely?
+        This gives you time to move and re-trigger the motion sensor.
+      default: 15
+      selector:
+        number:
+          min: 5
+          max: 60
+          step: 5
+          unit_of_measurement: seconds
+          mode: slider
+
+    # === OPTIONAL LUX SENSOR ===
+    lux_sensor:
+      name: Lux Sensor (Optional but Recommended)
+      description: >
+        ENHANCED! Select an illuminance sensor. When enabled, lights will only
+        activate if ambient light is below the threshold. In sun-aware mode, also
+        used for intelligent evening decisions (e.g., summer nights when it's still
+        bright outside at 10pm). Leave empty to always trigger lights regardless of
+        ambient light level.
+      default: {}
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              device_class: illuminance
+
+    lux_threshold:
+      name: Lux Threshold
+      description: >
+        Lights will only turn on if the lux sensor reads below this value.
+        Only applies if a lux sensor is selected above.
+      default: 100
+      selector:
+        number:
+          min: 0
+          max: 500
+          step: 10
+          unit_of_measurement: lux
+          mode: slider
+
+    lux_evening_override:
+      name: Use Lux for Evening Decisions (Sun-Aware Mode Only)
+      description: >
+        NEW! In summer when it's bright outside at bedtime (e.g., 10pm sunset),
+        use lux sensor to determine if warm evening light is needed. If it's
+        still bright outside, system maintains energizing light. If dark, enforces
+        sleep-friendly warmth regardless of sun position.
+      default: true
+      selector:
+        boolean:
+
+    lux_evening_threshold:
+      name: Evening Lux Threshold for Warmth
+      description: >
+        If lux drops below this value in the evening, force warm/sleep-friendly
+        lighting regardless of sun position. Useful for summer evenings.
+      default: 50
+      selector:
+        number:
+          min: 0
+          max: 200
+          step: 10
+          unit_of_measurement: lux
+          mode: slider
+
+    # === BEDTIME OVERRIDES SECTION ===
+    kids_bedtime_enabled:
+      name: Enable Kids Bedtime Override
+      description: >
+        NEW! Force specific color temperature at kids' bedtime regardless of sun
+        position. Ensures sleep-friendly lighting even during summer when it's
+        still light outside at 7-8pm.
+      default: false
+      selector:
+        boolean:
+
+    kids_bedtime:
+      name: Kids Bedtime
+      description: >
+        Time when kids' bedtime routine begins. Lights will shift to bedtime
+        color temperature at this time.
+      default: "19:00:00"
+      selector:
+        time:
+
+    kids_bedtime_temp:
+      name: Kids Bedtime Color Temperature
+      description: >
+        Color temperature (in Kelvin) for kids' bedtime. Recommended: 2200-2500K
+        for melatonin-friendly lighting.
+      default: 2200
+      selector:
+        number:
+          min: 2000
+          max: 3000
+          step: 100
+          unit_of_measurement: "K"
+          mode: slider
+
+    parents_bedtime_enabled:
+      name: Enable Parents Bedtime Override
+      description: >
+        NEW! Force specific color temperature at parents' bedtime regardless of
+        sun position.
+      default: false
+      selector:
+        boolean:
+
+    parents_bedtime:
+      name: Parents Bedtime
+      description: >
+        Time when parents' bedtime routine begins. Lights will shift to bedtime
+        color temperature at this time.
+      default: "22:00:00"
+      selector:
+        time:
+
+    parents_bedtime_temp:
+      name: Parents Bedtime Color Temperature
+      description: >
+        Color temperature (in Kelvin) for parents' bedtime. Recommended: 2200-2500K
+        for melatonin-friendly lighting.
+      default: 2200
+      selector:
+        number:
+          min: 2000
+          max: 3000
+          step: 100
+          unit_of_measurement: "K"
+          mode: slider
+
+    # === SUN-AWARE TIME BOUNDARIES ===
+    morning_earliest:
+      name: Morning Phase Earliest Start (Sun-Aware)
+      description: >
+        NEW! When using sun tracking, morning phase won't start before this time
+        even if sun rises earlier. Prevents 5:30am summer wake-ups. Ignored in
+        fixed-time mode.
+      default: "07:00:00"
+      selector:
+        time:
+
+    morning_latest:
+      name: Morning Phase Latest Start (Sun-Aware)
+      description: >
+        NEW! When using sun tracking, morning phase will start by this time even
+        if sun hasn't risen yet (winter). Maintains reasonable schedule.
+      default: "09:00:00"
+      selector:
+        time:
+
+    evening_earliest:
+      name: Evening Phase Earliest Start (Sun-Aware)
+      description: >
+        NEW! Evening wind-down won't start before this time, even if sun is setting.
+        Useful for maintaining consistent evening routines. Recommended: 18:00-19:00.
+      default: "18:00:00"
+      selector:
+        time:
+
+    evening_latest:
+      name: Evening Phase Latest Start (Sun-Aware)
+      description: >
+        NEW! Evening wind-down will begin by this time even if sun is still up
+        (summer). Prevents 10pm energizing light. Recommended: 20:00-21:00.
+      default: "20:30:00"
+      selector:
+        time:
+
+    # === TRADITIONAL FIXED TIME SETTINGS (Backward Compatible) ===
+    dawn_start:
+      name: Dawn Phase Start Time (Fixed Mode)
+      description: >
+        TRADITIONAL: When dawn phase begins in fixed-time mode. Warm sunrise tones (2000K).
+        Ignored when sun tracking is enabled.
+      default: "05:00:00"
+      selector:
+        time:
+
+    morning_start:
+      name: Morning Phase Start Time (Fixed Mode)
+      description: >
+        TRADITIONAL: When morning phase begins in fixed-time mode. Warm white (3000K).
+        Ignored when sun tracking is enabled.
+      default: "07:00:00"
+      selector:
+        time:
+
+    midday_start:
+      name: Midday Phase Start Time (Fixed Mode)
+      description: >
+        TRADITIONAL: When midday phase begins in fixed-time mode. Cool daylight (5500K).
+        Ignored when sun tracking is enabled.
+      default: "10:00:00"
+      selector:
+        time:
+
+    afternoon_start:
+      name: Afternoon Phase Start Time (Fixed Mode)
+      description: >
+        TRADITIONAL: When afternoon phase begins in fixed-time mode. Neutral white (4500K).
+        Ignored when sun tracking is enabled.
+      default: "15:00:00"
+      selector:
+        time:
+
+    evening_start:
+      name: Evening Phase Start Time (Fixed Mode)
+      description: >
+        TRADITIONAL: When evening phase begins in fixed-time mode. Warm white (3000K).
+        Ignored when sun tracking is enabled.
+      default: "18:00:00"
+      selector:
+        time:
+
+    night_start:
+      name: Night Phase Start Time (Fixed Mode)
+      description: >
+        TRADITIONAL: When night phase begins in fixed-time mode. Extra warm/amber (2200K).
+        Ignored when sun tracking is enabled.
+      default: "21:00:00"
+      selector:
+        time:
+
+# Mode set to restart so that if motion is detected again, the timer resets
+mode: restart
+max_exceeded: silent
+
+variables:
+  # Convert inputs to variables for easier reference
+  lux_sensor_entity: !input lux_sensor
+  lux_threshold_value: !input lux_threshold
+  lux_evening_override_enabled: !input lux_evening_override
+  lux_evening_threshold_value: !input lux_evening_threshold
+  brightness_adjustment: !input adjust_brightness
+  dim_warning: !input dim_warning_enabled
+  dim_brightness: !input dim_warning_brightness
+  dim_duration: !input dim_warning_duration
+
+  # Sun tracking configuration
+  sun_tracking: !input sun_tracking_enabled
+  sun_mode: !input sun_tracking_mode
+
+  # Bedtime overrides
+  kids_bedtime_override: !input kids_bedtime_enabled
+  kids_bed_time: !input kids_bedtime
+  kids_bed_temp: !input kids_bedtime_temp
+  parents_bedtime_override: !input parents_bedtime_enabled
+  parents_bed_time: !input parents_bedtime
+  parents_bed_temp: !input parents_bedtime_temp
+
+  # Sun-aware time boundaries
+  morning_min_time: !input morning_earliest
+  morning_max_time: !input morning_latest
+  evening_min_time: !input evening_earliest
+  evening_max_time: !input evening_latest
+
+  # Traditional fixed time boundaries for circadian phases
+  dawn_time: !input dawn_start
+  morning_time: !input morning_start
+  midday_time: !input midday_start
+  afternoon_time: !input afternoon_start
+  evening_time: !input evening_start
+  night_time: !input night_start
+
+  # Get sun elevation from sun.sun entity
+  sun_elevation: "{{ state_attr('sun.sun', 'elevation') | float(0) }}"
+
+  # Get sunrise and sunset times for today
+  sunrise_time: "{{ as_timestamp(state_attr('sun.sun', 'next_rising')) | timestamp_custom('%H:%M:%S') }}"
+  sunset_time: "{{ as_timestamp(state_attr('sun.sun', 'next_setting')) | timestamp_custom('%H:%M:%S') }}"
+
+  # Calculate current time as comparable value (total seconds since midnight)
+  current_time: "{{ now().hour * 3600 + now().minute * 60 + now().second }}"
+
+  # Convert fixed time inputs to seconds for comparison
+  dawn_seconds: "{{ strptime(dawn_time, '%H:%M:%S').hour * 3600 + strptime(dawn_time, '%H:%M:%S').minute * 60 }}"
+  morning_seconds: "{{ strptime(morning_time, '%H:%M:%S').hour * 3600 + strptime(morning_time, '%H:%M:%S').minute * 60 }}"
+  midday_seconds: "{{ strptime(midday_time, '%H:%M:%S').hour * 3600 + strptime(midday_time, '%H:%M:%S').minute * 60 }}"
+  afternoon_seconds: "{{ strptime(afternoon_time, '%H:%M:%S').hour * 3600 + strptime(afternoon_time, '%H:%M:%S').minute * 60 }}"
+  evening_seconds: "{{ strptime(evening_time, '%H:%M:%S').hour * 3600 + strptime(evening_time, '%H:%M:%S').minute * 60 }}"
+  night_seconds: "{{ strptime(night_time, '%H:%M:%S').hour * 3600 + strptime(night_time, '%H:%M:%S').minute * 60 }}"
+
+  # Convert sun-aware boundary times to seconds
+  morning_min_seconds: "{{ strptime(morning_min_time, '%H:%M:%S').hour * 3600 + strptime(morning_min_time, '%H:%M:%S').minute * 60 }}"
+  morning_max_seconds: "{{ strptime(morning_max_time, '%H:%M:%S').hour * 3600 + strptime(morning_max_time, '%H:%M:%S').minute * 60 }}"
+  evening_min_seconds: "{{ strptime(evening_min_time, '%H:%M:%S').hour * 3600 + strptime(evening_min_time, '%H:%M:%S').minute * 60 }}"
+  evening_max_seconds: "{{ strptime(evening_max_time, '%H:%M:%S').hour * 3600 + strptime(evening_max_time, '%H:%M:%S').minute * 60 }}"
+
+  # Convert bedtime overrides to seconds
+  kids_bedtime_seconds: "{{ strptime(kids_bed_time, '%H:%M:%S').hour * 3600 + strptime(kids_bed_time, '%H:%M:%S').minute * 60 }}"
+  parents_bedtime_seconds: "{{ strptime(parents_bed_time, '%H:%M:%S').hour * 3600 + strptime(parents_bed_time, '%H:%M:%S').minute * 60 }}"
+
+  # Check if we're in bedtime override period
+  in_kids_bedtime: >
+    {% if kids_bedtime_override %}
+      {{ current_time|int >= kids_bedtime_seconds|int }}
+    {% else %}
+      false
+    {% endif %}
+
+  in_parents_bedtime: >
+    {% if parents_bedtime_override %}
+      {{ current_time|int >= parents_bedtime_seconds|int }}
+    {% else %}
+      false
+    {% endif %}
+
+  # Check lux for evening override (summer scenario)
+  lux_suggests_warmth: >
+    {% if lux_evening_override_enabled and lux_sensor_entity %}
+      {{ states(lux_sensor_entity) | float(0) < lux_evening_threshold_value }}
+    {% else %}
+      false
+    {% endif %}
+
+  # === COLOR TEMPERATURE CALCULATION (The Core Logic) ===
+  # This is where the magic happens - sun-aware vs fixed-time decision making
+  color_temp_kelvin: >
+    {# First: Check bedtime overrides (highest priority) #}
+    {% if in_parents_bedtime and parents_bedtime_override %}
+      {{ parents_bed_temp }}
+    {% elif in_kids_bedtime and kids_bedtime_override %}
+      {{ kids_bed_temp }}
+
+    {# Second: Sun-aware mode calculations #}
+    {% elif sun_tracking %}
+      {# Sun tracking is enabled - use hybrid intelligent logic #}
+
+      {# Handle deep night (before dawn, after late evening) #}
+      {% if current_time|int < dawn_seconds|int or current_time|int >= evening_max_seconds|int %}
+        2200
+
+      {# Dawn phase - keep fixed time for consistent wake schedule #}
+      {% elif current_time|int >= dawn_seconds|int and current_time|int < morning_min_seconds|int %}
+        2000
+
+      {# Morning to afternoon - SUN TRACKING with boundaries #}
+      {% elif current_time|int >= morning_min_seconds|int and current_time|int < evening_min_seconds|int %}
+        {# Use sun elevation to calculate color temperature #}
+        {# Sun elevation ranges: -18° to 60° (Netherlands extremes) #}
+        {# Color temp ranges: 2000K (dawn) to 5500K (high noon) #}
+
+        {% set elevation = sun_elevation | float %}
+
+        {# Map sun elevation to color temperature with smooth curves #}
+        {% if elevation < -6 %}
+          {# Below horizon or civil twilight - warm tones #}
+          2200
+        {% elif elevation >= -6 and elevation < 0 %}
+          {# Civil twilight - gentle warm transition #}
+          {{ (2200 + (elevation + 6) * 133) | int }}  {# 2200K to 3000K #}
+        {% elif elevation >= 0 and elevation < 10 %}
+          {# Low sun - warming up #}
+          {{ (3000 + (elevation * 50)) | int }}  {# 3000K to 3500K #}
+        {% elif elevation >= 10 and elevation < 30 %}
+          {# Rising/falling sun - energizing #}
+          {{ (3500 + (elevation - 10) * 50) | int }}  {# 3500K to 4500K #}
+        {% elif elevation >= 30 and elevation < 50 %}
+          {# High sun - peak alertness #}
+          {{ (4500 + (elevation - 30) * 50) | int }}  {# 4500K to 5500K #}
+        {% else %}
+          {# Very high sun (summer midday) - maximum cool daylight #}
+          5500
+        {% endif %}
+
+      {# Evening transition zone - smart hybrid logic #}
+      {% elif current_time|int >= evening_min_seconds|int and current_time|int < evening_max_seconds|int %}
+        {# Evening: Balance sun tracking with social rhythm #}
+
+        {# If lux override is enabled and it's dark outside, force warmth #}
+        {% if lux_suggests_warmth %}
+          3000  {# Warm white for evening wind-down #}
+
+        {# If sun is still significantly up (summer), consider staying energized #}
+        {% elif sun_elevation > 5 %}
+          {# Sun still up - gentle warm but not sleep-disrupting #}
+          {{ (4000 - (current_time|int - evening_min_seconds|int) / (evening_max_seconds|int - evening_min_seconds|int) * 1000) | int }}
+
+        {# Sun is setting or set - progressive evening warmth #}
+        {% else %}
+          {{ (3500 - (current_time|int - evening_min_seconds|int) / (evening_max_seconds|int - evening_min_seconds|int) * 1300) | int }}
+        {% endif %}
+
+      {# Fallback to deep night warmth #}
+      {% else %}
+        2200
+      {% endif %}
+
+    {# Third: Traditional fixed-time mode (backward compatible) #}
+    {% else %}
+      {# Fixed-time circadian rhythm (original logic) #}
+      {% if current_time|int >= night_seconds|int or current_time|int < dawn_seconds|int %}
+        2200
+      {% elif current_time|int >= dawn_seconds|int and current_time|int < morning_seconds|int %}
+        2000
+      {% elif current_time|int >= morning_seconds|int and current_time|int < midday_seconds|int %}
+        3000
+      {% elif current_time|int >= midday_seconds|int and current_time|int < afternoon_seconds|int %}
+        5500
+      {% elif current_time|int >= afternoon_seconds|int and current_time|int < evening_seconds|int %}
+        4500
+      {% else %}
+        3000
+      {% endif %}
+    {% endif %}
+
+  # Convert Kelvin to mireds for Philips Hue and other lights
+  # Formula: mireds = 1,000,000 / kelvin
+  color_temp_mireds: "{{ (1000000 / color_temp_kelvin|int) | int }}"
+
+  # Brightness levels calculation
+  brightness_percent: >
+    {# If sun tracking is enabled, use sun-aware brightness #}
+    {% if sun_tracking and brightness_adjustment %}
+      {% set elevation = sun_elevation | float %}
+
+      {# Deep night or before dawn #}
+      {% if current_time|int < dawn_seconds|int or current_time|int >= evening_max_seconds|int %}
+        20
+
+      {# Dawn #}
+      {% elif current_time|int >= dawn_seconds|int and current_time|int < morning_min_seconds|int %}
+        40
+
+      {# Sun-based brightness during active day #}
+      {% elif elevation < 0 %}
+        30
+      {% elif elevation >= 0 and elevation < 10 %}
+        {{ (40 + elevation * 3) | int }}  {# 40% to 70% #}
+      {% elif elevation >= 10 and elevation < 30 %}
+        {{ (70 + (elevation - 10) * 1.5) | int }}  {# 70% to 100% #}
+      {% elif elevation >= 30 %}
+        100
+      {% else %}
+        70
+      {% endif %}
+
+    {# Traditional fixed-time brightness (original logic) #}
+    {% elif brightness_adjustment %}
+      {% if current_time|int >= night_seconds|int or current_time|int < dawn_seconds|int %}
+        20
+      {% elif current_time|int >= dawn_seconds|int and current_time|int < morning_seconds|int %}
+        40
+      {% elif current_time|int >= morning_seconds|int and current_time|int < midday_seconds|int %}
+        70
+      {% elif current_time|int >= midday_seconds|int and current_time|int < afternoon_seconds|int %}
+        100
+      {% elif current_time|int >= afternoon_seconds|int and current_time|int < evening_seconds|int %}
+        80
+      {% else %}
+        50
+      {% endif %}
+    {% else %}
+      100  {# Default if brightness adjustment is disabled #}
+    {% endif %}
+
+trigger:
+  # Trigger when any of the selected motion sensors detect motion
+  - platform: state
+    entity_id: !input motion_sensors
+    to: "on"
+
+condition:
+  # Only proceed if lux sensor is not configured OR if lux is below threshold
+  - condition: template
+    value_template: >
+      {% if lux_sensor_entity %}
+        {{ states(lux_sensor_entity) | float(0) < lux_threshold_value }}
+      {% else %}
+        true
+      {% endif %}
+
+action:
+  # Turn on lights with appropriate circadian settings (smooth 1.5 second fade-in)
+  - service: light.turn_on
+    target: !input target_lights
+    data: >
+      {% set data = {
+        'color_temp': color_temp_mireds | int,
+        'transition': 1.5
+      } %}
+      {% if brightness_adjustment %}
+        {% set data = dict(data, brightness_pct=brightness_percent | int) %}
+      {% endif %}
+      {{ data }}
+
+  # Wait for motion to clear
+  - wait_for_trigger:
+      - platform: state
+        entity_id: !input motion_sensors
+        to: "off"
+        for: !input light_timeout
+    timeout:
+      hours: 12
+    continue_on_timeout: false
+
+  # Considerate turn-off: Dim as warning first, then turn off
+  - choose:
+      # If dim warning is enabled, do two-step turn-off
+      - conditions:
+          - condition: template
+            value_template: "{{ dim_warning }}"
+        sequence:
+          # Step 1: Dim to warning brightness with 2 second transition
+          - service: light.turn_on
+            target: !input target_lights
+            data:
+              brightness_pct: "{{ dim_brightness }}"
+              transition: 2
+
+          # Step 2: Wait while dimmed (gives user time to re-trigger motion)
+          - delay:
+              seconds: "{{ dim_duration }}"
+
+          # Step 3: Turn off completely with 3 second fade
+          - service: light.turn_off
+            target: !input target_lights
+            data:
+              transition: 3
+    # If dim warning is disabled, just turn off smoothly
+    default:
+      - service: light.turn_off
+        target: !input target_lights
+        data:
+          transition: 2
