@@ -1,0 +1,656 @@
+blueprint:
+  name: Adjacent Zone Motion - Circadian Lighting v1.0
+  description: >
+    Motion-activated lighting for hallways, bathrooms, and stairs with EXACT color
+    consistency to the Intelligent Living Room blueprint. Features lux-aware control,
+    circadian rhythm, staged turn-off warnings, and zone-based timing presets.
+
+
+    This blueprint is OPTIMIZED for adjacent zones like hallways, bathrooms, stairs,
+    closets, and utility areas. It shares IDENTICAL circadian color logic with the
+    living room blueprint to ensure seamless color consistency throughout your home.
+
+
+    KEY FEATURES:
+
+
+    - MOTION SENSOR INTEGRATION: Works with any PIR or mmWave motion sensor. Simple
+      binary_sensor detection - no complex zone mapping required.
+
+
+    - ZONE PRESET SYSTEM: Quick-select timing presets for common zones:
+      * Very Quick (3/5/7 min) - Closets, Stairs
+      * Quick (5/10/15 min) - Hallways, Bathrooms (DEFAULT)
+      * Medium (10/15/20 min) - Utility, Garage
+      * Custom - Configure your own timing
+
+
+    - COLOR CONSISTENCY: EXACT same circadian sun elevation formula as living room.
+      Seamless color matching when walking between rooms (1800K-5500K range).
+
+
+    - LUX-AWARE HYSTERESIS: Hardcoded thresholds (150/80 lux) with debounce prevent
+      flickering. Same anti-flicker system as living room for consistency.
+
+
+    - DYNAMIC BRIGHTNESS: Brightness scales inversely with ambient lux using IDENTICAL
+      curve as living room (50/75/100/125/150 lux breakpoints).
+
+
+    - STAGED TURN-OFF: Progressive warnings before lights turn off. Dim to 40% with
+      warm 1800K color, then 20%, then off. Same dimming behavior as living room.
+
+
+    - MANUAL OVERRIDE: Button/switch/input_boolean support to keep lights on regardless
+      of lux level. Perfect for cleaning or extended bathroom use.
+
+
+    - SUNRISE/SUNSET SMART: Extended 10-minute debounce during dawn/dusk prevents
+      oscillation from rapidly changing natural light.
+
+
+    PERFECT FOR: Hallways, bathrooms, stairs, closets, laundry rooms, garages, any
+    adjacent zone that should match your main room's color temperature.
+
+
+    COMPATIBILITY: Works with any motion sensor, Philips Hue/IKEA Tradfri lights,
+    and standard illuminance sensors.
+
+  domain: automation
+  source_url: https://github.com/martinlevie/HomeAssistant-Repo/blueprints/adjacent_zone_motion_circadian_lighting.yaml
+
+  input:
+    # ============================================================================
+    # SECTION 1: LIGHTS AND SENSORS
+    # ============================================================================
+    target_lights:
+      name: Target Lights
+      description: >
+        Select the lights to control. Must support color temperature (tunable white).
+        Works with Philips Hue, IKEA Tradfri, and most smart bulbs with color_temp support.
+      selector:
+        target:
+          entity:
+            - domain: light
+
+    motion_sensor:
+      name: Motion Sensor
+      description: >
+        Motion sensor for this zone (PIR, mmWave, or occupancy sensor). When motion
+        detected, lights turn on (unless lux is too high). When motion clears, staged
+        turn-off begins based on zone preset timing.
+      selector:
+        entity:
+          filter:
+            - domain: binary_sensor
+              device_class: motion
+
+    lux_sensor:
+      name: Lux/Illuminance Sensor
+      description: >
+        Ambient light sensor for lux-aware control. Can be built-in sensor from motion
+        detector or separate illuminance sensor. Critical for anti-flicker hysteresis.
+        Hardcoded thresholds: 80 lux (ON) / 150 lux (OFF) for consistency with living room.
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              device_class: illuminance
+
+    # ============================================================================
+    # SECTION 2: ZONE PRESET SYSTEM
+    # ============================================================================
+    zone_preset:
+      name: Zone Type Preset
+      description: >
+        Quick-select for common zone types. Sets appropriate turn-off timing for the
+        space. Choose "Custom" to configure your own timing.
+      default: "quick"
+      selector:
+        select:
+          options:
+            - label: "Very Quick (3/5/7 min) - Closets, Stairs"
+              value: "very_quick"
+            - label: "Quick (5/10/15 min) - Hallways, Bathrooms"
+              value: "quick"
+            - label: "Medium (10/15/20 min) - Utility, Garage"
+              value: "medium"
+            - label: "Custom (Configure Manually)"
+              value: "custom"
+
+    # ============================================================================
+    # SECTION 3: CUSTOM TIMING (only used if preset = "custom")
+    # ============================================================================
+    custom_stage_1_delay:
+      name: Custom Stage 1 Delay (First Warning)
+      description: >
+        Only used if Zone Preset = Custom. Time after motion clears before first
+        warning (dim to 40% + warm to 1800K). Default: 5 minutes.
+      default: 5
+      selector:
+        number:
+          min: 1
+          max: 60
+          step: 1
+          unit_of_measurement: minutes
+          mode: slider
+
+    custom_stage_2_delay:
+      name: Custom Stage 2 Delay (Second Warning)
+      description: >
+        Only used if Zone Preset = Custom. Time before second warning (dim to 20%).
+        Default: 10 minutes.
+      default: 10
+      selector:
+        number:
+          min: 1
+          max: 60
+          step: 1
+          unit_of_measurement: minutes
+          mode: slider
+
+    custom_stage_3_delay:
+      name: Custom Stage 3 Delay (Complete Turn-Off)
+      description: >
+        Only used if Zone Preset = Custom. Time before lights turn off completely.
+        Default: 15 minutes.
+      default: 15
+      selector:
+        number:
+          min: 1
+          max: 60
+          step: 1
+          unit_of_measurement: minutes
+          mode: slider
+
+    # ============================================================================
+    # SECTION 4: MANUAL OVERRIDE SYSTEM
+    # ============================================================================
+    override_enabled:
+      name: Enable Manual Override System
+      description: >
+        Enable manual override to keep lights on regardless of lux level. Useful for
+        cleaning, extended bathroom use, or maintenance. Toggle behavior: activate
+        once = ON, activate again = OFF.
+      default: true
+      selector:
+        boolean:
+
+    override_trigger:
+      name: Override Trigger Entity (Optional)
+      description: >
+        Entity to trigger manual override toggle. Can be physical button (Aqara,
+        Hue dimmer), switch, or virtual input_boolean helper. Leave empty if override
+        system is disabled. Each activation flips override state.
+      default: {}
+      selector:
+        entity:
+
+    # ============================================================================
+    # SECTION 5: CIRCADIAN RHYTHM SETTINGS
+    # ============================================================================
+    circadian_enabled:
+      name: Enable Circadian Rhythm
+      description: >
+        Enable sun-aware circadian color temperature. Uses EXACT same sun elevation
+        formula as Intelligent Living Room blueprint for perfect color consistency.
+        Warmest baseline: 1800K. Updates every 60 seconds. Recommended: ENABLED.
+      default: true
+      selector:
+        boolean:
+
+    circadian_update_interval:
+      name: Circadian Update Frequency
+      description: >
+        How often to update color temperature based on sun position. Default: 60 seconds.
+        MUST match living room blueprint for color consistency. Lower = more responsive
+        but more automation triggers.
+      default: 60
+      selector:
+        number:
+          min: 30
+          max: 300
+          step: 30
+          unit_of_measurement: seconds
+          mode: slider
+
+    circadian_transition_duration:
+      name: Circadian Transition Duration
+      description: >
+        Smoothness of color temperature transitions. Default: 4 seconds. MUST match
+        living room blueprint for color consistency. Increase for gentler changes.
+      default: 4
+      selector:
+        number:
+          min: 1
+          max: 10
+          step: 1
+          unit_of_measurement: seconds
+          mode: slider
+
+    # ============================================================================
+    # SECTION 6: STAGED TURN-OFF (PROGRESSIVE WARNINGS)
+    # ============================================================================
+    staged_turnoff_enabled:
+      name: Enable Staged Turn-Off
+      description: >
+        Enable progressive warnings before complete shut-off. Prevents jarring sudden
+        darkness. Three stages with timing based on zone preset. Dimming percentages
+        (40%/20%) match living room for consistency. Recommended: ENABLED.
+      default: true
+      selector:
+        boolean:
+
+# Automation mode: restart ensures clean state management
+# If motion detected during any stage, automation restarts from beginning
+mode: restart
+max_exceeded: silent
+
+variables:
+  # === CORE ENTITY REFERENCES ===
+  lux_sensor_entity: !input lux_sensor
+  motion_sensor_entity: !input motion_sensor
+  override_trigger_entity: !input override_trigger
+
+  # === ZONE PRESET SYSTEM ===
+  preset: !input zone_preset
+  custom_stage_1: !input custom_stage_1_delay
+  custom_stage_2: !input custom_stage_2_delay
+  custom_stage_3: !input custom_stage_3_delay
+
+  # === CALCULATE DELAYS BASED ON PRESET ===
+  # Stage 1: First warning (dim to 40% + warm to 1800K)
+  stage_1_delay_minutes: >
+    {% if preset == 'very_quick' %}
+      3
+    {% elif preset == 'quick' %}
+      5
+    {% elif preset == 'medium' %}
+      10
+    {% else %}
+      {{ custom_stage_1 | int }}
+    {% endif %}
+
+  # Stage 2: Second warning (dim to 20%)
+  stage_2_delay_minutes: >
+    {% if preset == 'very_quick' %}
+      5
+    {% elif preset == 'quick' %}
+      10
+    {% elif preset == 'medium' %}
+      15
+    {% else %}
+      {{ custom_stage_2 | int }}
+    {% endif %}
+
+  # Stage 3: Complete turn-off
+  stage_3_delay_minutes: >
+    {% if preset == 'very_quick' %}
+      7
+    {% elif preset == 'quick' %}
+      15
+    {% elif preset == 'medium' %}
+      20
+    {% else %}
+      {{ custom_stage_3 | int }}
+    {% endif %}
+
+  # Convert to seconds for delay actions
+  stage_1_delay_sec: "{{ (stage_1_delay_minutes | int) * 60 }}"
+  stage_2_delay_sec: "{{ (stage_2_delay_minutes | int) * 60 }}"
+  stage_3_delay_sec: "{{ (stage_3_delay_minutes | int) * 60 }}"
+
+  # === LUX THRESHOLDS (HARDCODED FOR CONSISTENCY WITH LIVING ROOM) ===
+  # These values are NOT configurable - they match the living room blueprint
+  # to ensure consistent anti-flicker behavior across all zones
+  lux_on_threshold: 80          # Turn ON when lux drops below 80
+  lux_off_threshold: 150        # Turn OFF when lux rises above 150
+  lux_on_debounce_sec: 120      # 2 minutes ON debounce
+  lux_off_debounce_sec: 300     # 5 minutes OFF debounce
+  sunrise_sunset_debounce_sec: 600  # 10 minutes extended debounce
+
+  # === DIMMING PERCENTAGES (HARDCODED TO MATCH LIVING ROOM) ===
+  stage_1_brightness_pct: 40    # First warning: 40% brightness
+  stage_2_brightness_pct: 20    # Second warning: 20% brightness
+
+  # === FEATURE FLAGS ===
+  override_system_enabled: !input override_enabled
+  circadian_rhythm: !input circadian_enabled
+  staged_turnoff: !input staged_turnoff_enabled
+
+  # === CIRCADIAN SETTINGS ===
+  circadian_update_sec: !input circadian_update_interval
+  circadian_transition_sec: !input circadian_transition_duration
+
+  # === CURRENT LUX READING ===
+  current_lux: "{{ states(lux_sensor_entity) | float(0) }}"
+
+  # === SUN POSITION DATA ===
+  sun_elevation: "{{ state_attr('sun.sun', 'elevation') | float(0) }}"
+
+  # Calculate sunrise/sunset times for today
+  sunrise_timestamp: "{{ as_timestamp(state_attr('sun.sun', 'next_rising')) | int }}"
+  sunset_timestamp: "{{ as_timestamp(state_attr('sun.sun', 'next_setting')) | int }}"
+  current_timestamp: "{{ now().timestamp() | int }}"
+
+  # === SUNRISE/SUNSET DETECTION (1 hour window before/after) ===
+  # Check if we're within 1 hour before/after sunrise
+  is_near_sunrise: >
+    {{ (current_timestamp >= (sunrise_timestamp - 3600) and
+        current_timestamp <= (sunrise_timestamp + 3600)) }}
+
+  # Check if we're within 1 hour before/after sunset
+  is_near_sunset: >
+    {{ (current_timestamp >= (sunset_timestamp - 3600) and
+        current_timestamp <= (sunset_timestamp + 3600)) }}
+
+  # Combined dawn/dusk detection
+  is_dawn_or_dusk: >
+    {{ is_near_sunrise or is_near_sunset }}
+
+  # === SMART DEBOUNCE SELECTION ===
+  # Use extended debounce during sunrise/sunset, normal debounce otherwise
+  effective_off_debounce: >
+    {% if is_dawn_or_dusk %}
+      {{ sunrise_sunset_debounce_sec }}
+    {% else %}
+      {{ lux_off_debounce_sec }}
+    {% endif %}
+
+  # === OVERRIDE SYSTEM STATE ===
+  # Check if override is currently active
+  override_active: >
+    {% if override_system_enabled and override_trigger_entity %}
+      {{ is_state(override_trigger_entity, 'on') }}
+    {% else %}
+      false
+    {% endif %}
+
+  # === DYNAMIC BRIGHTNESS CALCULATION (HARDCODED CURVE - MATCHES LIVING ROOM) ===
+  # Brightness scales inversely with lux (brighter outside = dimmer lights)
+  # Uses IDENTICAL breakpoints as living room blueprint for consistency
+  calculated_brightness: >
+    {% set lux = current_lux | float %}
+    {% if lux <= 50 %}
+      100
+    {% elif lux <= 75 %}
+      {# Linear interpolation between 50 and 75 lux #}
+      {% set range_pct = (lux - 50) / 25 %}
+      {{ (100 - (100 - 85) * range_pct) | int }}
+    {% elif lux <= 100 %}
+      {# Linear interpolation between 75 and 100 lux #}
+      {% set range_pct = (lux - 75) / 25 %}
+      {{ (85 - (85 - 70) * range_pct) | int }}
+    {% elif lux <= 125 %}
+      {# Linear interpolation between 100 and 125 lux #}
+      {% set range_pct = (lux - 100) / 25 %}
+      {{ (70 - (70 - 55) * range_pct) | int }}
+    {% elif lux <= 150 %}
+      {# Linear interpolation between 125 and 150 lux #}
+      {% set range_pct = (lux - 125) / 25 %}
+      {{ (55 - (55 - 40) * range_pct) | int }}
+    {% else %}
+      {# Above 150 lux - use minimum brightness #}
+      40
+    {% endif %}
+
+  # === CIRCADIAN COLOR TEMPERATURE CALCULATION (SUN-AWARE) ===
+  # EXACT COPY from intelligent_living_room_mmwave_lux_aware.yaml (lines 718-750)
+  # This formula ensures IDENTICAL color temperature across all zones
+  color_temp_kelvin: >
+    {% if circadian_rhythm %}
+      {% set elevation = sun_elevation | float %}
+
+      {# Deep night (sun well below horizon) #}
+      {% if elevation < -6 %}
+        1800
+
+      {# Civil twilight (sun just below horizon) - gentle warm transition #}
+      {% elif elevation >= -6 and elevation < 0 %}
+        {{ (1800 + (elevation + 6) * 200) | int }}  {# 1800K to 3000K #}
+
+      {# Low sun (sunrise/sunset) - warming up or cooling down #}
+      {% elif elevation >= 0 and elevation < 10 %}
+        {{ (3000 + (elevation * 50)) | int }}  {# 3000K to 3500K #}
+
+      {# Rising/falling sun - energizing transition #}
+      {% elif elevation >= 10 and elevation < 30 %}
+        {{ (3500 + (elevation - 10) * 75) | int }}  {# 3500K to 5000K #}
+
+      {# High sun - peak alertness #}
+      {% elif elevation >= 30 and elevation < 50 %}
+        {{ (5000 + (elevation - 30) * 25) | int }}  {# 5000K to 5500K #}
+
+      {# Very high sun (summer midday) - maximum cool daylight #}
+      {% else %}
+        5500
+      {% endif %}
+    {% else %}
+      3000  {# Default warm white if circadian disabled #}
+    {% endif %}
+
+  # === CONVERT KELVIN TO MIREDS (Philips Hue native format) ===
+  # Formula: mireds = 1,000,000 / kelvin
+  # Ensures compatibility with color_temp service calls
+  color_temp_mireds: "{{ (1000000 / (color_temp_kelvin | int)) | int }}"
+
+  # === STAGED TURN-OFF WARNING COLOR ===
+  # Always 1800K warm during staged warnings (converted to mireds)
+  # MATCHES living room blueprint exactly
+  warning_color_temp_mireds: "{{ (1000000 / 1800) | int }}"
+
+trigger:
+  # === TRIGGER 1: MOTION DETECTED ===
+  # Motion sensor triggers automation start
+  - platform: state
+    entity_id: !input motion_sensor
+    to: "on"
+    id: motion_detected
+
+  # === TRIGGER 2: MANUAL OVERRIDE TOGGLE ===
+  # Override trigger activates/deactivates manual override mode
+  - platform: state
+    entity_id: !input override_trigger
+    id: override_toggled
+
+  # === TRIGGER 3: CIRCADIAN UPDATE CYCLE ===
+  # Periodic update for circadian color temperature (every 60 seconds by default)
+  - platform: time_pattern
+    minutes: "/1"
+    id: circadian_update
+
+action:
+  # === ACTION FLOW DECISION TREE ===
+  - choose:
+      # ======================================================================
+      # BRANCH 1: MANUAL OVERRIDE TOGGLE
+      # ======================================================================
+      - conditions:
+          - condition: trigger
+            id: override_toggled
+        sequence:
+          # Override trigger pressed - toggle state is handled by the entity itself
+          # (input_boolean, switch, or binary_sensor already changes state)
+          # No action needed here - automation will check override_active variable
+          # on next motion trigger
+          - service: system_log.write
+            data:
+              message: "Override toggled. New state: {{ override_active }}"
+              level: info
+
+      # ======================================================================
+      # BRANCH 2: MOTION DETECTED (MAIN LOGIC WITH LUX HYSTERESIS)
+      # ======================================================================
+      - conditions:
+          - condition: trigger
+            id: motion_detected
+        sequence:
+          # === LUX HYSTERESIS CHECK (ANTI-FLICKER LOGIC) ===
+          # Only turn on if:
+          # 1. Override is active (ignore lux), OR
+          # 2. Lux is below ON threshold (after debounce)
+
+          - choose:
+              # Override active - turn on immediately regardless of lux
+              - conditions:
+                  - condition: template
+                    value_template: "{{ override_active }}"
+                sequence:
+                  - service: light.turn_on
+                    target: !input target_lights
+                    data:
+                      brightness_pct: "{{ calculated_brightness }}"
+                      color_temp: "{{ color_temp_mireds }}"
+                      transition: 2
+
+              # Override not active - check lux hysteresis
+              - conditions:
+                  - condition: template
+                    value_template: "{{ current_lux < lux_on_threshold }}"
+                sequence:
+                  # Lux is below ON threshold - wait for debounce before turning on
+                  - wait_template: "{{ states(lux_sensor_entity) | float < lux_on_threshold }}"
+                    timeout:
+                      seconds: "{{ lux_on_debounce_sec }}"
+                    continue_on_timeout: false
+
+                  # Debounce passed - turn on lights
+                  - service: light.turn_on
+                    target: !input target_lights
+                    data:
+                      brightness_pct: "{{ calculated_brightness }}"
+                      color_temp: "{{ color_temp_mireds }}"
+                      transition: 2
+
+            # If neither condition met (lux too high, no override) - do nothing
+
+          # === CONTINUOUS MOTION MONITORING ===
+          # While motion is active, continuously update brightness and color
+          - repeat:
+              sequence:
+                # Wait for circadian update interval
+                - delay:
+                    seconds: "{{ circadian_update_sec }}"
+
+                # Check if lights are still on and motion still detected
+                - condition: state
+                  entity_id: !input motion_sensor
+                  state: "on"
+
+                # Update lights with current circadian color and dynamic brightness
+                # Only update if lux is still low enough OR override is active
+                - choose:
+                    # Normal circadian update
+                    - conditions:
+                        - condition: template
+                          value_template: "{{ override_active or (current_lux < lux_off_threshold) }}"
+                      sequence:
+                        - service: light.turn_on
+                          target: !input target_lights
+                          data:
+                            brightness_pct: "{{ calculated_brightness }}"
+                            color_temp: "{{ color_temp_mireds }}"
+                            transition: "{{ circadian_transition_sec }}"
+
+                    # Lux exceeded OFF threshold - wait for debounce then turn off
+                    - conditions:
+                        - condition: template
+                          value_template: "{{ not override_active and (current_lux >= lux_off_threshold) }}"
+                      sequence:
+                        # Wait for lux to stay high for debounce period
+                        - wait_template: "{{ states(lux_sensor_entity) | float >= lux_off_threshold }}"
+                          timeout:
+                            seconds: "{{ effective_off_debounce }}"
+                          continue_on_timeout: false
+
+                        # Debounce passed - turn off lights (lux too high)
+                        - service: light.turn_off
+                          target: !input target_lights
+                          data:
+                            transition: 5
+
+                        # Exit repeat loop
+                        - stop: "Lights turned off due to high lux"
+
+              # Continue updating until motion clears
+              until:
+                - condition: state
+                  entity_id: !input motion_sensor
+                  state: "off"
+
+          # === MOTION CLEARED - START STAGED TURN-OFF ===
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ staged_turnoff }}"
+                sequence:
+                  # === STAGED TURN-OFF SEQUENCE ===
+                  # Stage 1: Wait, then dim to 40% + warm to 1800K
+                  - delay:
+                      seconds: "{{ stage_1_delay_sec }}"
+
+                  - service: light.turn_on
+                    target: !input target_lights
+                    data:
+                      brightness_pct: "{{ stage_1_brightness_pct }}"
+                      color_temp: "{{ warning_color_temp_mireds }}"
+                      transition: 3
+
+                  # Stage 2: Wait, then dim to 20% (keep 1800K)
+                  - delay:
+                      seconds: "{{ stage_2_delay_sec - stage_1_delay_sec }}"
+
+                  - service: light.turn_on
+                    target: !input target_lights
+                    data:
+                      brightness_pct: "{{ stage_2_brightness_pct }}"
+                      color_temp: "{{ warning_color_temp_mireds }}"
+                      transition: 3
+
+                  # Stage 3: Wait, then turn off completely
+                  - delay:
+                      seconds: "{{ stage_3_delay_sec - stage_2_delay_sec }}"
+
+                  - service: light.turn_off
+                    target: !input target_lights
+                    data:
+                      transition: 3
+
+            default:
+              # Staged turn-off disabled - simple turn-off after stage 3 delay
+              - delay:
+                  seconds: "{{ stage_3_delay_sec }}"
+
+              - service: light.turn_off
+                target: !input target_lights
+                data:
+                  transition: 3
+
+      # ======================================================================
+      # BRANCH 3: CIRCADIAN UPDATE CYCLE (BACKGROUND UPDATES)
+      # ======================================================================
+      - conditions:
+          - condition: trigger
+            id: circadian_update
+          - condition: template
+            value_template: "{{ circadian_rhythm }}"
+          # Only update if lights are currently on
+          - condition: template
+            value_template: "{{ is_state_attr((target_lights.entity_id[0] if target_lights.entity_id is iterable else target_lights.entity_id) | string, 'state', 'on') }}"
+        sequence:
+          # Update color temperature based on current sun position
+          # Only if lux allows OR override is active
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ override_active or (current_lux < lux_off_threshold) }}"
+                sequence:
+                  - service: light.turn_on
+                    target: !input target_lights
+                    data:
+                      brightness_pct: "{{ calculated_brightness }}"
+                      color_temp: "{{ color_temp_mireds }}"
+                      transition: "{{ circadian_transition_sec }}"
+
+    # === DEFAULT BRANCH (FALLBACK) ===
+    default: []
