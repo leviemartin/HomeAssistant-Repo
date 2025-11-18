@@ -22,8 +22,8 @@ https://raw.githubusercontent.com/leviemartin/HomeAssistant-Repo/main/blueprints
 
 [📖 Quick Start Guide](blueprints/QUICK_START.md) | [🔬 Scientific Details](blueprints/SUN_AWARE_UPGRADE_GUIDE.md) | [⚖️ Feature Comparison](blueprints/FEATURE_COMPARISON.md)
 
-### 3. Intelligent Living Room Lighting (mmWave + Lux Aware) ⭐ NEW
-Advanced living room automation with Aqara FP2 mmWave presence detection, natural light awareness, and anti-flicker protection. Features sun-aware circadian rhythm integration, dynamic brightness scaling, and staged turn-off warnings.
+### 3. Intelligent Living Room Lighting (mmWave + Lux Aware) ⭐ NEW v1.1
+Advanced living room automation with Aqara FP2 mmWave presence detection, natural light awareness, and anti-flicker protection. Features sun-aware circadian rhythm integration, dynamic brightness scaling, staged turn-off warnings, and **NEW: Scene Cycling** (cycle through 3 Philips Hue scenes with one button).
 
 **Import URL:**
 ```
@@ -217,7 +217,11 @@ evening_latest: "20:30:00"
   - 40 min: Dim to 20% + warm to 1800K (strong warning)
   - 45 min: Turn off with 3-second fade
 - **Easy Override System** - Toggle via button/switch/input_boolean to keep lights on regardless of lux
-- **Philips Hue Compatible** - Color_temp mode (mireds)
+- **Scene Cycling (NEW v1.1)** - Single button cycles through 3 Hue scenes (Movie → Reading → Party → Off)
+  - Smart scene skipping (disabled scenes automatically skipped)
+  - State persists across HA restarts
+  - Optional presence timeout bypass
+- **Philips Hue Compatible** - Color_temp mode (mireds) + Scene integration
 
 ### Quick Start
 
@@ -251,10 +255,15 @@ Result: No flicker, smooth operation, natural feel.
 - [🔬 Anti-Flicker Technical Guide](blueprints/ANTI_FLICKER_TECHNICAL_GUIDE.md) - Deep dive into hysteresis logic
 - [📡 FP2 Features Reference](blueprints/FP2_FEATURES_REFERENCE.md) - Aqara FP2 capabilities
 
-### Future Enhancements (v1.1+)
+### Recent Enhancements (v1.1)
+
+- ✅ **Scene Cycling** - Cycle through 3 Philips Hue scenes with single button
+- ✅ **State Persistence** - Scene state survives HA restarts via input_number helper
+- ✅ **Smart Skipping** - Automatically skips disabled scenes in cycle
+
+### Future Enhancements (v1.2+)
 
 - Night Lights Mode (separate late-night settings)
-- Scene Integration (activate scenes instead of basic on/off)
 - Adaptive Lighting Detection (pause on manual changes)
 - Auto-Off Safety Timer (maximum on-time)
 - Multi-zone support (different FP2 zones)
