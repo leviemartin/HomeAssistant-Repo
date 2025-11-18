@@ -1,9 +1,9 @@
-# Intelligent Living Room Blueprint v1.0 - Complete Setup Guide
+# Intelligent Living Room Blueprint v1.1 - Complete Setup Guide
 
-Comprehensive guide for setting up advanced lux-aware presence lighting with anti-flicker hysteresis, dynamic brightness, circadian rhythm, and manual override.
+Comprehensive guide for setting up advanced lux-aware presence lighting with anti-flicker hysteresis, dynamic brightness, circadian rhythm, manual override, and scene cycling.
 
-**Version**: 1.0.0
-**Last Updated**: 2025-11-17
+**Version**: 1.1.0
+**Last Updated**: 2025-11-18
 **Compatibility**: Home Assistant 2024.1+
 
 ## Table of Contents
@@ -15,8 +15,9 @@ Comprehensive guide for setting up advanced lux-aware presence lighting with ant
 5. [Advanced Features](#advanced-features)
 6. [FP2 Configuration](#fp2-configuration)
 7. [Override System Setup](#override-system-setup)
-8. [Troubleshooting](#troubleshooting)
-9. [Example Configurations](#example-configurations)
+8. [Scene Cycling Override (NEW v1.1)](#scene-cycling-override-new-v11)
+9. [Troubleshooting](#troubleshooting)
+10. [Example Configurations](#example-configurations)
 
 ---
 
@@ -778,6 +779,692 @@ card:
 
 ---
 
+## Scene Cycling Override (NEW v1.1)
+
+Advanced scene cycling system allowing you to cycle through up to 3 Philips Hue scenes with a single button press. Perfect for Movie Mode, Reading Mode, and Party Mode presets.
+
+### Overview
+
+The scene cycling feature allows you to:
+- Press button once: Activate Scene 1 (e.g., Movie Mode)
+- Press button again: Activate Scene 2 (e.g., Reading Mode)
+- Press button again: Activate Scene 3 (e.g., Party Mode)
+- Press button again: Return to normal automation
+
+**Key Features**:
+- Scenes override lux-based control and circadian lighting
+- Configurable presence timeout bypass (keep scene on even when room empty)
+- Each scene can be enabled/disabled independently
+- State persists across Home Assistant restarts
+- Fully backward compatible (optional feature)
+
+### Prerequisites
+
+Before setting up scene cycling, you need:
+
+1. **Philips Hue Scenes** (or Home Assistant scenes)
+   - Created via Philips Hue app or HA Scenes interface
+   - Automatically synced to Home Assistant
+   - Must be entity domain: `scene`
+
+2. **Input Number Helper** (for state tracking)
+   - Create via Settings > Helpers
+   - Stores current scene state (0-3)
+
+3. **Button/Switch** (for cycling)
+   - Physical button (Hue dimmer, Aqara button)
+   - Virtual input_button or input_boolean
+   - Any entity that can trigger on state change
+
+### Step 1: Create Philips Hue Scenes
+
+#### Option A: Via Philips Hue App (Recommended)
+
+1. Open Philips Hue app on your phone
+2. Navigate to **Scenes** tab
+3. Tap **Create Scene** (+ icon)
+4. Configure each scene:
+
+**Scene 1: Movie Mode**
+```
+Name: Living Room Movie
+Lights: Select all living room lights
+Brightness: 30-40%
+Color: Warm white (2000-2500K) or dim orange
+Save scene
+```
+
+**Scene 2: Reading Mode**
+```
+Name: Living Room Reading
+Lights: Select all living room lights
+Brightness: 80-100%
+Color: Neutral white (3500-4000K)
+Save scene
+```
+
+**Scene 3: Party Mode**
+```
+Name: Living Room Party
+Lights: Select all living room lights
+Brightness: 100%
+Color: Dynamic/colorful (use color loop or vibrant colors)
+Save scene
+```
+
+5. Wait 1-2 minutes for scenes to sync to Home Assistant
+6. Verify scenes in HA:
+   - Go to **Developer Tools** > **States**
+   - Search for `scene.living_room_movie`
+   - Verify all 3 scenes appear
+
+#### Option B: Via Home Assistant Scenes
+
+1. Navigate to **Settings** > **Automations & Scenes** > **Scenes**
+2. Click **Create Scene** (bottom right)
+3. Configure scene:
+   ```yaml
+   Name: Living Room Movie Mode
+   Entities:
+     - light.living_room_ceiling:
+         state: on
+         brightness: 40
+         color_temp: 454  # ~2200K warm
+     - light.living_room_lamp:
+         state: on
+         brightness: 30
+         color_temp: 454
+   ```
+4. Save scene
+5. Repeat for all 3 scenes
+
+**Scene Naming Tips**:
+- Use descriptive names: "Living Room Movie" not just "Movie"
+- Include room name for clarity with multiple rooms
+- Keep names short (under 25 characters)
+
+### Step 2: Create Input Number Helper (State Tracker)
+
+This helper tracks which scene is currently active.
+
+1. Navigate to **Settings** > **Devices & Services** > **Helpers**
+2. Click **Create Helper** (bottom right)
+3. Select **Number**
+4. Configure:
+   ```
+   Name: Living Room Scene State
+   Icon: mdi:lightbulb-multiple (or mdi:movie-open)
+   Minimum value: 0
+   Maximum value: 3
+   Step: 1
+   Display mode: Auto (or Box)
+   Unit of measurement: (leave empty)
+   ```
+5. Click **Create**
+6. Verify entity created: `input_number.living_room_scene_state`
+
+**What the values mean**:
+- `0` = No scene active (normal automation)
+- `1` = Scene 1 active (Movie Mode)
+- `2` = Scene 2 active (Reading Mode)
+- `3` = Scene 3 active (Party Mode)
+
+**Optional: Add to Dashboard**
+
+Add the helper to your dashboard to see current scene state:
+
+```yaml
+type: entity
+entity: input_number.living_room_scene_state
+name: Active Scene
+icon: mdi:lightbulb-multiple
+```
+
+This shows which scene is currently active (useful for debugging).
+
+### Step 3: Configure Scene Cycle Button
+
+Choose one of these methods for your cycle button:
+
+#### Option A: Philips Hue Dimmer Switch (Physical)
+
+**Best for**: Wall-mounted convenience, tactile feedback
+
+1. Ensure Hue Dimmer is paired to Home Assistant
+2. Verify entity exists:
+   ```
+   Developer Tools > States > Search: hue_dimmer
+   Look for: sensor.hue_dimmer_living_room_button
+   ```
+3. Note the button entity for blueprint configuration
+4. Button will trigger on any press (on, off, up, down)
+
+**Recommended button mapping**:
+- Use "ON" button for scene cycling
+- Use "OFF" button for manual override toggle
+- Use "UP/DOWN" buttons for brightness adjustment (separate automation)
+
+#### Option B: Aqara Wireless Button (Physical)
+
+**Best for**: Portable control, battery-powered convenience
+
+1. Pair Aqara button via Aqara Home or Zigbee2MQTT
+2. Verify entity:
+   ```
+   Developer Tools > States
+   Search: aqara_button or wireless_button
+   Look for: event.aqara_button_action or sensor.aqara_button_action
+   ```
+3. Note the entity for blueprint configuration
+
+**Supported Aqara buttons**:
+- WXKG11LM (original round button)
+- WXKG12LM (revised round button)
+- WXKG13LM (square button - recommended)
+
+#### Option C: Virtual Input Button (Dashboard)
+
+**Best for**: Testing, dashboard-only control
+
+1. Settings > Devices & Services > Helpers
+2. Create Helper > Button
+3. Configure:
+   ```
+   Name: Living Room Scene Cycle
+   Icon: mdi:cached
+   ```
+4. Add to dashboard:
+   ```yaml
+   type: button
+   entity: input_button.living_room_scene_cycle
+   name: Cycle Scene
+   icon: mdi:movie-open
+   tap_action:
+     action: perform-action
+     perform_action: input_button.press
+   ```
+
+#### Option D: Virtual Input Boolean (Toggle)
+
+**Best for**: Two-way state tracking
+
+1. Settings > Devices & Services > Helpers
+2. Create Helper > Toggle
+3. Configure:
+   ```
+   Name: Living Room Scene Cycle Trigger
+   Icon: mdi:cached
+   ```
+4. Use in blueprint (toggles on each press)
+
+### Step 4: Blueprint Configuration
+
+Now configure the blueprint with scene cycling:
+
+1. Edit your existing Living Room automation
+2. Scroll to **SECTION 4B: SCENE CYCLING OVERRIDE SYSTEM**
+3. Configure inputs:
+
+#### Enable Scene Cycling
+```yaml
+Enable Scene Cycling System: ON
+```
+
+#### State Tracker
+```yaml
+Scene State Tracker Helper: input_number.living_room_scene_state
+```
+
+#### Cycle Button
+```yaml
+Scene Cycle Button:
+  - sensor.hue_dimmer_living_room_button (Hue dimmer)
+  - event.aqara_button_action (Aqara button)
+  - input_button.living_room_scene_cycle (virtual button)
+```
+
+#### Scene 1 Configuration
+```yaml
+Enable Scene 1: ON
+Scene 1 Entity: scene.living_room_movie
+Scene 1 Name: Movie Mode
+```
+
+#### Scene 2 Configuration
+```yaml
+Enable Scene 2: ON
+Scene 2 Entity: scene.living_room_reading
+Scene 2 Name: Reading Mode
+```
+
+#### Scene 3 Configuration
+```yaml
+Enable Scene 3: ON
+Scene 3 Entity: scene.living_room_party
+Scene 3 Name: Party Mode
+```
+
+#### Scene Behavior
+```yaml
+Scene Bypass Presence Timeout:
+  - OFF (default) - Scene respects 30/40/45 min turn-off when presence clears
+  - ON - Scene stays on indefinitely until manually cycled off
+```
+
+**Recommended setting**:
+- **OFF** for safety (lights still turn off if you forget)
+- **ON** for movie nights (lights stay on even during quiet scenes)
+
+4. Click **Save**
+
+### Step 5: Testing Scene Cycling
+
+#### Test 1: Basic Cycling
+
+1. **Initial state**: Lights should be in normal automation mode
+2. **Press button once**: Scene 1 activates (Movie Mode)
+   - Verify lights change to Scene 1 settings
+   - Check `input_number.living_room_scene_state` = 1
+3. **Press button again**: Scene 2 activates (Reading Mode)
+   - Verify lights change to Scene 2 settings
+   - Check state tracker = 2
+4. **Press button again**: Scene 3 activates (Party Mode)
+   - Verify lights change to Scene 3 settings
+   - Check state tracker = 3
+5. **Press button again**: Return to normal automation
+   - Verify lights transition to circadian color/brightness
+   - Check state tracker = 0
+
+**Expected behavior**:
+- Smooth 2-second transitions between scenes
+- State tracker updates immediately
+- Lights reflect scene settings instantly
+
+#### Test 2: Scene Override Behavior
+
+**Scenario**: Scene active, test lux-based turn-off
+
+1. Activate Scene 1 (Movie Mode)
+2. Open curtains (increase lux to 300+, above OFF threshold)
+3. Wait 5+ minutes (normal debounce period)
+4. **Expected**: Lights stay on (scene ignores lux)
+5. **Verify**: Lux-based turn-off is bypassed
+
+**Scenario**: Scene active, test circadian updates
+
+1. Activate Scene 2 (Reading Mode)
+2. Wait 60+ seconds (circadian update interval)
+3. **Expected**: Lights stay at Scene 2 settings (no color change)
+4. **Verify**: Circadian rhythm updates are skipped
+
+**Scenario**: Scene active, presence clears
+
+1. Activate Scene 1 (Movie Mode)
+2. Leave room (clear presence)
+3. **If bypass OFF**:
+   - 30 min: Lights dim to Stage 1 (40%, 1800K) - scene overridden
+   - 40 min: Lights dim to Stage 2 (20%, 1800K)
+   - 45 min: Lights turn off
+4. **If bypass ON**:
+   - Lights stay at Scene 1 settings indefinitely
+   - No staged turn-off occurs
+
+#### Test 3: Disabled Scene Skipping
+
+**Scenario**: Scene 2 disabled, test cycling
+
+1. Edit automation: Set **Enable Scene 2** = OFF
+2. Save automation
+3. Press button from state 0 (off)
+4. **Expected**: Scene 1 activates (state = 1)
+5. Press button again
+6. **Expected**: Scene 3 activates (state = 3, skips disabled Scene 2)
+7. Press button again
+8. **Expected**: Return to off (state = 0)
+
+**Verify**: Disabled scenes are automatically skipped in cycle
+
+#### Test 4: State Persistence
+
+1. Activate Scene 2 (Reading Mode)
+2. Restart Home Assistant:
+   - Settings > System > Restart
+3. Wait for restart to complete
+4. **Expected**: Scene 2 still active (state tracker = 2)
+5. **Verify**: Lights maintain Scene 2 settings after restart
+
+### Advanced Configuration
+
+#### Customizing Scene Behavior
+
+**Use Case 1: Movie Night (Bypass Enabled)**
+```yaml
+Scene 1 (Movie Mode):
+  Scene: scene.living_room_movie (dim, warm)
+  Bypass Presence Timeout: ON
+
+Result: Lights stay dim throughout movie, even during quiet scenes
+when presence sensor might not detect small movements.
+```
+
+**Use Case 2: Reading Time (Bypass Disabled)**
+```yaml
+Scene 2 (Reading Mode):
+  Scene: scene.living_room_reading (bright, focused)
+  Bypass Presence Timeout: OFF
+
+Result: Lights stay bright while reading, but turn off after 45 min
+if you fall asleep or leave the room.
+```
+
+**Use Case 3: Party Mode (Bypass Enabled)**
+```yaml
+Scene 3 (Party Mode):
+  Scene: scene.living_room_party (colorful, dynamic)
+  Bypass Presence Timeout: ON
+
+Result: Party lights stay on throughout event, even if people
+temporarily move to other rooms.
+```
+
+#### Conditional Scene Cycling (Advanced)
+
+Create smart automations that auto-activate scenes:
+
+**Auto Movie Mode at Night**:
+```yaml
+alias: Auto Movie Mode at Night
+trigger:
+  - platform: time
+    at: "21:00:00"  # 9 PM
+condition:
+  - condition: state
+    entity_id: binary_sensor.living_room_presence
+    state: "on"
+  - condition: state
+    entity_id: media_player.living_room_tv
+    state: "playing"
+action:
+  # Set scene tracker to 1 (Movie Mode)
+  - service: input_number.set_value
+    target:
+      entity_id: input_number.living_room_scene_state
+    data:
+      value: 1
+  # Activate Movie Mode scene
+  - service: scene.turn_on
+    target:
+      entity_id: scene.living_room_movie
+```
+
+**Auto Reading Mode in Morning**:
+```yaml
+alias: Auto Reading Mode Weekends
+trigger:
+  - platform: time
+    at: "08:00:00"
+condition:
+  - condition: state
+    entity_id: binary_sensor.weekend
+    state: "on"
+  - condition: state
+    entity_id: binary_sensor.living_room_presence
+    state: "on"
+action:
+  - service: input_number.set_value
+    target:
+      entity_id: input_number.living_room_scene_state
+    data:
+      value: 2
+  - service: scene.turn_on
+    target:
+      entity_id: scene.living_room_reading
+```
+
+#### Dashboard Scene Control
+
+Create advanced dashboard controls:
+
+**Scene Selector Card**:
+```yaml
+type: entities
+title: Living Room Scenes
+entities:
+  - entity: input_number.living_room_scene_state
+    name: Current Scene
+    secondary_info: last-changed
+
+  - type: button
+    name: Movie Mode
+    icon: mdi:movie-open
+    tap_action:
+      action: perform-action
+      perform_action: input_number.set_value
+      data:
+        entity_id: input_number.living_room_scene_state
+        value: 1
+
+  - type: button
+    name: Reading Mode
+    icon: mdi:book-open-page-variant
+    tap_action:
+      action: perform-action
+      perform_action: input_number.set_value
+      data:
+        entity_id: input_number.living_room_scene_state
+        value: 2
+
+  - type: button
+    name: Party Mode
+    icon: mdi:party-popper
+    tap_action:
+      action: perform-action
+      perform_action: input_number.set_value
+      data:
+        entity_id: input_number.living_room_scene_state
+        value: 3
+
+  - type: button
+    name: Normal Automation
+    icon: mdi:home-automation
+    tap_action:
+      action: perform-action
+      perform_action: input_number.set_value
+      data:
+        entity_id: input_number.living_room_scene_state
+        value: 0
+```
+
+**Scene Status Conditional Card**:
+```yaml
+type: conditional
+conditions:
+  - entity: input_number.living_room_scene_state
+    state_not: "0"
+card:
+  type: markdown
+  content: |
+    {% set scene_state = states('input_number.living_room_scene_state') | int %}
+    {% if scene_state == 1 %}
+      🎬 **Movie Mode Active**
+      Lights in cinema mode. Press scene button to change.
+    {% elif scene_state == 2 %}
+      📖 **Reading Mode Active**
+      Bright focused lighting. Press scene button to change.
+    {% elif scene_state == 3 %}
+      🎉 **Party Mode Active**
+      Dynamic colorful lighting. Press scene button to change.
+    {% endif %}
+  title: Active Scene Override
+```
+
+### Troubleshooting Scene Cycling
+
+#### Issue: Button press doesn't cycle scenes
+
+**Diagnosis**:
+1. Check button entity triggers:
+   ```
+   Settings > Automations > Your automation > Traces
+   Look for "scene_cycle_pressed" trigger
+   ```
+2. Check scene cycling enabled:
+   ```
+   Edit automation > "Enable Scene Cycling System" = ON
+   ```
+3. Check state tracker entity:
+   ```
+   Developer Tools > States > input_number.living_room_scene_state
+   Should exist and show value 0-3
+   ```
+
+**Solutions**:
+- Ensure button entity is correct in blueprint config
+- Verify button actually changes state (Developer Tools > States)
+- Check automation mode = "restart" (allows re-triggering)
+- Review automation traces for errors
+
+#### Issue: Scenes don't activate (lights don't change)
+
+**Diagnosis**:
+1. Check scene entity exists:
+   ```
+   Developer Tools > States > scene.living_room_movie
+   Should be listed
+   ```
+2. Test scene manually:
+   ```
+   Developer Tools > Actions
+   Action: scene.turn_on
+   Entity: scene.living_room_movie
+   Call Service
+   ```
+3. Check scene configuration:
+   ```
+   Edit automation > Verify scene entities are filled in
+   Not empty/default {}
+   ```
+
+**Solutions**:
+- Recreate scenes in Philips Hue app or HA Scenes
+- Wait 2-3 minutes for Hue scenes to sync
+- Verify scene entities are correctly spelled
+- Check scene entities match domain: `scene.xxx`
+
+#### Issue: State tracker doesn't update
+
+**Diagnosis**:
+1. Check input_number permissions:
+   ```
+   Developer Tools > States > input_number.living_room_scene_state
+   Should allow editing (not read-only)
+   ```
+2. Check for automation errors:
+   ```
+   Settings > System > Logs
+   Search for: input_number.set_value errors
+   ```
+
+**Solutions**:
+- Recreate input_number helper (delete and create new)
+- Verify Min=0, Max=3, Step=1
+- Check no other automations are conflicting
+- Restart Home Assistant if helper just created
+
+#### Issue: Scene stays active after cycling to "Off"
+
+**Diagnosis**:
+1. Check state tracker value:
+   ```
+   Developer Tools > States > input_number.living_room_scene_state
+   Should be 0 when "off"
+   ```
+2. Check presence status:
+   ```
+   If presence = OFF and lux is high, lights may turn off
+   normally (expected behavior)
+   ```
+
+**Solutions**:
+- Manually set state tracker to 0 (Developer Tools > States > Set value)
+- Verify presence detected before expecting lights to resume normal
+- Check lux level is below ON threshold (< 80 lux)
+- Press button again to manually cycle back to off state
+
+#### Issue: Bypass timeout not working
+
+**Diagnosis**:
+1. Check bypass setting:
+   ```
+   Edit automation > "Scene Bypass Presence Timeout"
+   Should be ON if you want lights to stay on indefinitely
+   ```
+2. Check presence status:
+   ```
+   Developer Tools > States > binary_sensor.xxx_presence
+   Should show "off" when testing bypass
+   ```
+
+**Solutions**:
+- Verify bypass enabled in blueprint
+- Leave room to test (presence must actually clear)
+- Check automation traces for "Scene bypass" log messages
+- If bypass OFF, lights WILL turn off after 45 min (normal)
+
+#### Issue: Circadian updates still happening during scene
+
+**Diagnosis**:
+1. Check scene state:
+   ```
+   input_number.living_room_scene_state should be > 0
+   ```
+2. Check automation traces:
+   ```
+   Look for "Skipping circadian update - scene X is active"
+   ```
+
+**Solutions**:
+- Verify scene state tracker is actually set to 1, 2, or 3
+- Check blueprint variables: `scene_is_active` should be true
+- Review automation logic (ensure scene checks are in place)
+- File bug report if circadian updates still occurring
+
+### Scene Cycling Best Practices
+
+1. **Scene Design**:
+   - Make scenes distinctly different (easy to tell which is active)
+   - Test scenes in actual room conditions
+   - Consider transition times (2 sec default is good for most)
+
+2. **Button Placement**:
+   - Mount physical buttons near seating area
+   - Test button reach from common sitting positions
+   - Consider wireless range for battery buttons
+
+3. **State Tracker Management**:
+   - Add to dashboard for visibility
+   - Include in Home Assistant groups if using multiple rooms
+   - Back up helper configuration (Settings > System > Backups)
+
+4. **Bypass Strategy**:
+   - Use bypass OFF for safety (default)
+   - Use bypass ON only for specific use cases (movies, parties)
+   - Consider time-based automations to auto-disable bypass
+
+5. **Testing**:
+   - Test full cycle: 0→1→2→3→0
+   - Test with presence clearing (verify bypass behavior)
+   - Test scene persistence after HA restart
+   - Test lux override (scenes should ignore lux)
+
+6. **Backward Compatibility**:
+   - Scene cycling is fully optional
+   - Existing override system still works independently
+   - Can use both systems together (override + scene cycling)
+   - Disable scene cycling anytime (no harm to automation)
+
+---
+
 ## Troubleshooting
 
 ### Common Issues and Solutions
@@ -1408,9 +2095,9 @@ Approach Detection: DISABLED (saves resources)
 
 ---
 
-## Future Enhancements (Not in v1.0)
+## Future Enhancements
 
-These features are **not implemented** in v1.0 but are planned for future releases:
+These features are planned for future releases:
 
 ### Night Lights Mode
 **Concept**: Separate lighting behavior for nighttime hours (e.g., 11 PM - 6 AM)
@@ -1419,15 +2106,15 @@ These features are **not implemented** in v1.0 but are planned for future releas
 - Faster turn-off sequence (5-10 minutes)
 - Ideal for bathroom trips, late-night kitchen visits
 
-**Status**: Not implemented in v1.0 - coming in v1.1
+**Status**: Coming in v1.2
 
-### Scene Integration
-**Concept**: Automatically pause automation when specific scenes are active
-- Movie scene active → Disable lux turn-off
-- Party scene → Override brightness settings
-- Sleep scene → Force night mode
+### Scene Cycling (IMPLEMENTED in v1.1)
+**Concept**: Cycle through multiple Philips Hue scenes with a single button
+- Movie scene, Reading scene, Party scene
+- Scenes override lux-based control and circadian lighting
+- Configurable presence timeout bypass
 
-**Status**: Not implemented in v1.0 - coming in v1.2
+**Status**: ✅ IMPLEMENTED in v1.1 - See [Scene Cycling Override](#scene-cycling-override-new-v11)
 
 ### Adaptive Lighting Detection
 **Concept**: Auto-detect when Home Assistant Adaptive Lighting component is active

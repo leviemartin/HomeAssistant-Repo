@@ -1,12 +1,12 @@
 blueprint:
-  name: Intelligent Living Room - mmWave + Lux-Aware v1.0
+  name: Intelligent Living Room - mmWave + Lux-Aware v1.1
   description: >
     Professional-grade lighting automation combining mmWave presence detection,
     lux-aware hysteresis anti-flicker logic, staged turn-off sequences, dynamic
-    brightness adjustment, and sun-aware circadian rhythm for natural lighting.
+    brightness adjustment, sun-aware circadian rhythm, and Philips Hue scene cycling.
 
 
-    This is v1.0 - production-ready, triple-checked, and optimized for Philips Hue.
+    This is v1.1 - adds scene cycling feature with single-button override control.
 
 
     KEY FEATURES:
@@ -35,6 +35,11 @@ blueprint:
 
     - MANUAL OVERRIDE: Button/switch/input_boolean support. Toggle behavior to keep
       lights on regardless of lux. Override disables lux-based turn-off while active.
+
+
+    - SCENE CYCLING: NEW! Cycle through up to 3 Philips Hue scenes with a single button.
+      Press once for Movie Mode, again for Reading Mode, again for Party Mode, again to
+      return to normal automation. Scenes override lux-based control and circadian lighting.
 
 
     - SUNRISE/SUNSET SMART: 10-minute extended debounce during dawn/dusk prevents
@@ -207,6 +212,146 @@ blueprint:
       default: {}
       selector:
         entity:
+
+    # ============================================================================
+    # SECTION 4B: SCENE CYCLING OVERRIDE SYSTEM (NEW v1.1)
+    # ============================================================================
+    scene_cycling_enabled:
+      name: Enable Scene Cycling System
+      description: >
+        Enable advanced scene cycling with a single button. Press once for Scene 1,
+        again for Scene 2, again for Scene 3, again to return to normal automation.
+        Perfect for Movie Mode, Reading Mode, Party Mode presets. Requires input_number
+        helper for state tracking (create via Settings > Helpers).
+      default: false
+      selector:
+        boolean:
+
+    scene_state_tracker:
+      name: Scene State Tracker Helper (Required for Scene Cycling)
+      description: >
+        input_number helper to track which scene is active (0=Off, 1=Scene1, 2=Scene2, 3=Scene3).
+        CREATE THIS FIRST: Settings > Devices & Services > Helpers > Create Helper > Number.
+        Set Min=0, Max=3, Step=1. See setup guide for detailed instructions.
+      default: {}
+      selector:
+        entity:
+          filter:
+            - domain: input_number
+
+    scene_cycle_button:
+      name: Scene Cycle Button (Required for Scene Cycling)
+      description: >
+        Button or entity to cycle through scene overrides. Each press advances to next scene.
+        Can be physical button (Hue dimmer, Aqara button) or virtual input_button/input_boolean.
+        Supports button, event, switch, input_boolean, input_button domains.
+      default: {}
+      selector:
+        entity:
+          filter:
+            - domain: [button, event, switch, input_boolean, input_button]
+
+    # --- Scene 1 Configuration ---
+    override_scene_1_enabled:
+      name: Enable Scene 1
+      description: >
+        Enable first scene in cycle (e.g., Movie Mode). If disabled, button press will skip
+        to next enabled scene. Disable all scenes to effectively disable scene cycling.
+      default: true
+      selector:
+        boolean:
+
+    override_scene_1:
+      name: Scene 1 Entity (e.g., Movie Mode)
+      description: >
+        Philips Hue scene or Home Assistant scene to activate for Scene 1. Scene must be
+        created first (via Philips Hue app or HA Scenes). Leave empty if Scene 1 disabled.
+      default: {}
+      selector:
+        entity:
+          filter:
+            - domain: scene
+
+    override_scene_1_name:
+      name: Scene 1 Name
+      description: >
+        Display name for Scene 1 (for logging/debugging). Examples: "Movie Mode", "Cozy Evening",
+        "TV Time". Does not affect scene activation - only for human reference.
+      default: "Movie Mode"
+      selector:
+        text:
+
+    # --- Scene 2 Configuration ---
+    override_scene_2_enabled:
+      name: Enable Scene 2
+      description: >
+        Enable second scene in cycle (e.g., Reading Mode). If disabled, button press will skip
+        to next enabled scene.
+      default: true
+      selector:
+        boolean:
+
+    override_scene_2:
+      name: Scene 2 Entity (e.g., Reading Mode)
+      description: >
+        Philips Hue scene or Home Assistant scene to activate for Scene 2. Scene must be
+        created first (via Philips Hue app or HA Scenes). Leave empty if Scene 2 disabled.
+      default: {}
+      selector:
+        entity:
+          filter:
+            - domain: scene
+
+    override_scene_2_name:
+      name: Scene 2 Name
+      description: >
+        Display name for Scene 2 (for logging/debugging). Examples: "Reading Mode", "Bright Focus",
+        "Work Mode". Does not affect scene activation - only for human reference.
+      default: "Reading Mode"
+      selector:
+        text:
+
+    # --- Scene 3 Configuration ---
+    override_scene_3_enabled:
+      name: Enable Scene 3
+      description: >
+        Enable third scene in cycle (e.g., Party Mode). If disabled, button press will skip
+        to next enabled scene or cycle back to Off.
+      default: true
+      selector:
+        boolean:
+
+    override_scene_3:
+      name: Scene 3 Entity (e.g., Party Mode)
+      description: >
+        Philips Hue scene or Home Assistant scene to activate for Scene 3. Scene must be
+        created first (via Philips Hue app or HA Scenes). Leave empty if Scene 3 disabled.
+      default: {}
+      selector:
+        entity:
+          filter:
+            - domain: scene
+
+    override_scene_3_name:
+      name: Scene 3 Name
+      description: >
+        Display name for Scene 3 (for logging/debugging). Examples: "Party Mode", "Colorful",
+        "Energetic". Does not affect scene activation - only for human reference.
+      default: "Party Mode"
+      selector:
+        text:
+
+    # --- Scene Behavior Configuration ---
+    scene_bypass_presence_timeout:
+      name: Scene Bypass Presence Timeout
+      description: >
+        When scene is active, should it bypass the presence timeout (staged turn-off)?
+        ENABLED: Scene stays on indefinitely until manually cycled off (ignores presence).
+        DISABLED: Scene respects staged turn-off timing (30/40/45 min when presence clears).
+        Recommended: DISABLED for safety, ENABLED for movie nights.
+      default: false
+      selector:
+        boolean:
 
     # ============================================================================
     # SECTION 5: DYNAMIC BRIGHTNESS SETTINGS
@@ -424,6 +569,29 @@ variables:
   approach_sensor_entity: !input approach_sensor
   override_trigger_entity: !input override_trigger
 
+  # === SCENE CYCLING SYSTEM REFERENCES ===
+  scene_cycling_system_enabled: !input scene_cycling_enabled
+  scene_tracker_entity: !input scene_state_tracker
+  scene_button_entity: !input scene_cycle_button
+
+  # Scene 1 configuration
+  scene_1_enabled: !input override_scene_1_enabled
+  scene_1_entity: !input override_scene_1
+  scene_1_name: !input override_scene_1_name
+
+  # Scene 2 configuration
+  scene_2_enabled: !input override_scene_2_enabled
+  scene_2_entity: !input override_scene_2
+  scene_2_name: !input override_scene_2_name
+
+  # Scene 3 configuration
+  scene_3_enabled: !input override_scene_3_enabled
+  scene_3_entity: !input override_scene_3
+  scene_3_name: !input override_scene_3_name
+
+  # Scene behavior
+  scene_bypass_timeout: !input scene_bypass_presence_timeout
+
   # === LUX THRESHOLDS AND DEBOUNCE ===
   lux_on_threshold: !input lux_turn_on_threshold
   lux_off_threshold: !input lux_turn_off_threshold
@@ -495,6 +663,23 @@ variables:
   override_active: >
     {% if override_system_enabled and override_trigger_entity %}
       {{ is_state(override_trigger_entity, 'on') }}
+    {% else %}
+      false
+    {% endif %}
+
+  # === SCENE CYCLING STATE ===
+  # Get current scene state from input_number (0=Off, 1=Scene1, 2=Scene2, 3=Scene3)
+  current_scene_state: >
+    {% if scene_cycling_system_enabled and scene_tracker_entity %}
+      {{ states(scene_tracker_entity) | int(0) }}
+    {% else %}
+      0
+    {% endif %}
+
+  # Check if ANY scene is currently active (state > 0)
+  scene_is_active: >
+    {% if scene_cycling_system_enabled and scene_tracker_entity %}
+      {{ (states(scene_tracker_entity) | int(0)) > 0 }}
     {% else %}
       false
     {% endif %}
@@ -594,6 +779,12 @@ trigger:
     entity_id: !input override_trigger
     id: override_toggled
 
+  # === TRIGGER 3B: SCENE CYCLE BUTTON ===
+  # Scene cycling button press - cycles through 3 scenes and back to off
+  - platform: state
+    entity_id: !input scene_cycle_button
+    id: scene_cycle_pressed
+
   # === TRIGGER 4: CIRCADIAN UPDATE CYCLE ===
   # Periodic update for circadian color temperature (every 60 seconds by default)
   - platform: time_pattern
@@ -620,6 +811,157 @@ action:
               level: info
 
       # ======================================================================
+      # BRANCH 1B: SCENE CYCLE BUTTON PRESSED (NEW v1.1)
+      # ======================================================================
+      - conditions:
+          - condition: trigger
+            id: scene_cycle_pressed
+          - condition: template
+            value_template: "{{ scene_cycling_system_enabled }}"
+          - condition: template
+            value_template: "{{ scene_tracker_entity != none and scene_tracker_entity != '' }}"
+        sequence:
+          # === SCENE CYCLING LOGIC ===
+          # Calculate next state based on current state and which scenes are enabled
+          # Current state from input_number: 0 (off) | 1 (scene1) | 2 (scene2) | 3 (scene3)
+          # Logic: Find next enabled scene, or wrap to 0 if at end
+
+          - variables:
+              # Get current state
+              current_state: "{{ states(scene_tracker_entity) | int(0) }}"
+
+              # Calculate next state (cycle through enabled scenes only)
+              next_state: >
+                {% set current = states(scene_tracker_entity) | int(0) %}
+                {% if current == 0 %}
+                  {# Currently off - find first enabled scene #}
+                  {% if scene_1_enabled and scene_1_entity %}
+                    1
+                  {% elif scene_2_enabled and scene_2_entity %}
+                    2
+                  {% elif scene_3_enabled and scene_3_entity %}
+                    3
+                  {% else %}
+                    0
+                  {% endif %}
+                {% elif current == 1 %}
+                  {# Currently scene 1 - find next enabled scene #}
+                  {% if scene_2_enabled and scene_2_entity %}
+                    2
+                  {% elif scene_3_enabled and scene_3_entity %}
+                    3
+                  {% else %}
+                    0
+                  {% endif %}
+                {% elif current == 2 %}
+                  {# Currently scene 2 - find next enabled scene #}
+                  {% if scene_3_enabled and scene_3_entity %}
+                    3
+                  {% else %}
+                    0
+                  {% endif %}
+                {% else %}
+                  {# Currently scene 3 or invalid state - cycle back to off #}
+                  0
+                {% endif %}
+
+          # Update input_number to next state
+          - service: input_number.set_value
+            target:
+              entity_id: "{{ scene_tracker_entity }}"
+            data:
+              value: "{{ next_state }}"
+
+          # Execute action based on new state
+          - choose:
+              # === STATE 1: ACTIVATE SCENE 1 ===
+              - conditions:
+                  - condition: template
+                    value_template: "{{ next_state | int == 1 }}"
+                  - condition: template
+                    value_template: "{{ scene_1_enabled and scene_1_entity }}"
+                sequence:
+                  - service: system_log.write
+                    data:
+                      message: "Scene cycling: Activating {{ scene_1_name }}"
+                      level: info
+
+                  - service: scene.turn_on
+                    target:
+                      entity_id: "{{ scene_1_entity }}"
+                    data:
+                      transition: 2
+
+              # === STATE 2: ACTIVATE SCENE 2 ===
+              - conditions:
+                  - condition: template
+                    value_template: "{{ next_state | int == 2 }}"
+                  - condition: template
+                    value_template: "{{ scene_2_enabled and scene_2_entity }}"
+                sequence:
+                  - service: system_log.write
+                    data:
+                      message: "Scene cycling: Activating {{ scene_2_name }}"
+                      level: info
+
+                  - service: scene.turn_on
+                    target:
+                      entity_id: "{{ scene_2_entity }}"
+                    data:
+                      transition: 2
+
+              # === STATE 3: ACTIVATE SCENE 3 ===
+              - conditions:
+                  - condition: template
+                    value_template: "{{ next_state | int == 3 }}"
+                  - condition: template
+                    value_template: "{{ scene_3_enabled and scene_3_entity }}"
+                sequence:
+                  - service: system_log.write
+                    data:
+                      message: "Scene cycling: Activating {{ scene_3_name }}"
+                      level: info
+
+                  - service: scene.turn_on
+                    target:
+                      entity_id: "{{ scene_3_entity }}"
+                    data:
+                      transition: 2
+
+              # === STATE 0: DEACTIVATE SCENE (RETURN TO NORMAL) ===
+              - conditions:
+                  - condition: template
+                    value_template: "{{ next_state | int == 0 }}"
+                sequence:
+                  - service: system_log.write
+                    data:
+                      message: "Scene cycling: Deactivated, returning to normal automation"
+                      level: info
+
+                  # Resume normal automation - restore circadian color and dynamic brightness
+                  # Only if presence detected and lux allows
+                  - choose:
+                      - conditions:
+                          - condition: state
+                            entity_id: !input presence_sensor
+                            state: "on"
+                          - condition: template
+                            value_template: "{{ override_active or (current_lux < lux_on_threshold) }}"
+                        sequence:
+                          - service: light.turn_on
+                            target: !input target_lights
+                            data:
+                              brightness_pct: "{{ calculated_brightness }}"
+                              color_temp: "{{ color_temp_mireds }}"
+                              transition: 3
+                    default:
+                      # No presence or lux too high - turn lights off
+                      - service: light.turn_off
+                        target: !input target_lights
+                        data:
+                          transition: 3
+
+      # ======================================================================
       # BRANCH 2: APPROACH DETECTION (IMMEDIATE ACTIVATION)
       # ======================================================================
       - conditions:
@@ -629,13 +971,25 @@ action:
             value_template: "{{ approach_sensor_entity != none and approach_sensor_entity != '' }}"
         sequence:
           # Approach detected - turn on lights immediately regardless of lux
-          # Use current circadian color and dynamic brightness
-          - service: light.turn_on
-            target: !input target_lights
-            data:
-              brightness_pct: "{{ calculated_brightness }}"
-              color_temp: "{{ color_temp_mireds }}"
-              transition: 1  # Quick 1-second fade for approach response
+          # Check if scene is active first, otherwise use circadian color and dynamic brightness
+          - choose:
+              # If scene active, don't override it with approach detection
+              - conditions:
+                  - condition: template
+                    value_template: "{{ scene_is_active }}"
+                sequence:
+                  - service: system_log.write
+                    data:
+                      message: "Approach detected but scene {{ current_scene_state }} is active - preserving scene"
+                      level: info
+            default:
+              # No scene active - normal approach behavior
+              - service: light.turn_on
+                target: !input target_lights
+                data:
+                  brightness_pct: "{{ calculated_brightness }}"
+                  color_temp: "{{ color_temp_mireds }}"
+                  transition: 1  # Quick 1-second fade for approach response
 
           # Wait for presence to clear before starting turn-off sequence
           - wait_for_trigger:
@@ -645,6 +999,21 @@ action:
             timeout:
               hours: 12
             continue_on_timeout: false
+
+          # Presence cleared - check if scene bypass is active
+          # If scene active AND bypass enabled, don't turn off
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ scene_is_active and scene_bypass_timeout }}"
+                sequence:
+                  - service: system_log.write
+                    data:
+                      message: "Presence cleared but scene {{ current_scene_state }} has bypass enabled - keeping lights on"
+                      level: info
+                  # Exit - don't proceed to turn-off
+                  - stop: "Scene bypass timeout enabled - lights stay on"
+            default: []
 
           # Presence cleared - proceed to staged turn-off (if enabled)
           - choose:
@@ -707,6 +1076,17 @@ action:
           # 2. Lux is below ON threshold (after debounce)
 
           - choose:
+              # Scene active - preserve scene, don't override with circadian
+              - conditions:
+                  - condition: template
+                    value_template: "{{ scene_is_active }}"
+                sequence:
+                  - service: system_log.write
+                    data:
+                      message: "Presence detected but scene {{ current_scene_state }} is active - preserving scene"
+                      level: info
+                  # Scene is already active, no need to turn on lights
+
               # Override active - turn on immediately regardless of lux
               - conditions:
                   - condition: template
@@ -719,7 +1099,7 @@ action:
                       color_temp: "{{ color_temp_mireds }}"
                       transition: 2
 
-              # Override not active - check lux hysteresis
+              # Override not active and no scene - check lux hysteresis
               - conditions:
                   - condition: template
                     value_template: "{{ current_lux < lux_on_threshold }}"
@@ -754,8 +1134,20 @@ action:
                   state: "on"
 
                 # Update lights with current circadian color and dynamic brightness
-                # But only if lux is still low enough OR override is active
+                # But SKIP if scene is active (scene overrides circadian)
+                # Otherwise only update if lux is still low enough OR override is active
                 - choose:
+                    # Scene active - skip circadian updates to preserve scene
+                    - conditions:
+                        - condition: template
+                          value_template: "{{ scene_is_active }}"
+                      sequence:
+                        - service: system_log.write
+                          data:
+                            message: "Skipping circadian update - scene {{ current_scene_state }} is active"
+                            level: debug
+
+                    # No scene active - normal circadian update
                     - conditions:
                         - condition: template
                           value_template: "{{ override_active or (current_lux < lux_off_threshold) }}"
@@ -768,9 +1160,10 @@ action:
                             transition: "{{ circadian_transition_sec }}"
 
                     # Lux exceeded OFF threshold - wait for debounce then turn off
+                    # But SKIP if scene is active (scene ignores lux)
                     - conditions:
                         - condition: template
-                          value_template: "{{ not override_active and (current_lux >= lux_off_threshold) }}"
+                          value_template: "{{ not override_active and not scene_is_active and (current_lux >= lux_off_threshold) }}"
                       sequence:
                         # Wait for lux to stay high for debounce period
                         - wait_template: "{{ states(lux_sensor_entity) | float >= lux_off_threshold }}"
@@ -794,6 +1187,21 @@ action:
                   state: "off"
 
           # === PRESENCE CLEARED - START STAGED TURN-OFF ===
+          # Check if scene bypass is active first
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ scene_is_active and scene_bypass_timeout }}"
+                sequence:
+                  - service: system_log.write
+                    data:
+                      message: "Presence cleared but scene {{ current_scene_state }} has bypass enabled - keeping lights on"
+                      level: info
+                  # Exit - don't proceed to turn-off
+                  - stop: "Scene bypass timeout enabled - lights stay on"
+            default: []
+
+          # No scene bypass - proceed to staged turn-off
           - choose:
               - conditions:
                   - condition: template
@@ -851,6 +1259,9 @@ action:
           # Only update if lights are currently on
           - condition: template
             value_template: "{{ is_state_attr(target_lights.entity_id[0] if target_lights.entity_id is iterable else target_lights.entity_id, 'state', 'on') }}"
+          # Skip if scene is active (scene overrides circadian)
+          - condition: template
+            value_template: "{{ not scene_is_active }}"
         sequence:
           # Update color temperature based on current sun position
           # Only if lux allows OR override is active
