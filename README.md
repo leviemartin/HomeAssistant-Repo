@@ -32,7 +32,17 @@ https://raw.githubusercontent.com/leviemartin/HomeAssistant-Repo/main/blueprints
 
 [📖 Quick Start](blueprints/INTELLIGENT_LIVING_ROOM_QUICK_START.md) | [📘 Complete Setup Guide](blueprints/INTELLIGENT_LIVING_ROOM_SETUP_GUIDE.md) | [🔬 Anti-Flicker Technical Guide](blueprints/ANTI_FLICKER_TECHNICAL_GUIDE.md) | [📡 FP2 Features Reference](blueprints/FP2_FEATURES_REFERENCE.md)
 
-### 4. Child-Friendly Night Light Automation (Ages 1-5)
+### 4. Adjacent Zone Motion Sensor with Circadian Lighting ⭐ NEW
+Motion-activated lighting for hallways, bathrooms, and stairs with GUARANTEED color consistency to the living room blueprint. Uses identical circadian formulas (1800K-5500K) but with shorter turn-off intervals perfect for quick-transition spaces. Features zone presets (Very Quick/Quick/Medium) and anti-flicker protection.
+
+**Import URL:**
+```
+https://raw.githubusercontent.com/leviemartin/HomeAssistant-Repo/main/blueprints/adjacent_zone_motion_circadian_lighting.yaml
+```
+
+[📖 Quick Start](blueprints/ADJACENT_ZONE_QUICK_START.md) | [📘 Complete Setup Guide](blueprints/ADJACENT_ZONE_SETUP_GUIDE.md) | [🎨 Color Consistency Guide](blueprints/COLOR_CONSISTENCY_GUIDE.md)
+
+### 5. Child-Friendly Night Light Automation (Ages 1-5)
 Research-based night light automation specifically designed for young children's sensitive sleep physiology. Ultra-low brightness and warm amber light minimize melatonin suppression while providing safe nighttime visibility.
 
 **Import URL:**
@@ -268,6 +278,93 @@ Result: No flicker, smooth operation, natural feel.
 - Auto-Off Safety Timer (maximum on-time)
 - Multi-zone support (different FP2 zones)
 - Target count awareness (brighter with more people)
+
+---
+
+## Adjacent Zone Motion Sensor with Circadian Lighting ⭐ NEW
+
+### Key Features
+
+- **100% Color Consistency** - Extracted IDENTICAL circadian formulas from living room blueprint
+- **Hardcoded Lux Thresholds** - 150/80 lux (not configurable) for guaranteed matching
+- **Zone Preset System** - Quick-select timing profiles:
+  - **Very Quick** (3/5/7 min) - Closets, Stairs
+  - **Quick** (5/10/15 min) - Hallways, Bathrooms ✅ Default
+  - **Medium** (10/15/20 min) - Utility, Garage
+  - **Custom** - Manual configuration
+- **Sun-Aware Circadian Rhythm**:
+  - 1800K-5500K based on sun elevation
+  - Identical mapping to living room
+  - 60-second continuous updates
+- **Anti-Flicker Protection**:
+  - Hysteresis: 150 lux OFF / 80 lux ON (50 lux dead band)
+  - Debouncing: 5 min before OFF, 2 min before ON
+  - Extended sunrise/sunset debounce (10 minutes)
+- **Dynamic Brightness Scaling** - Inverse relationship with natural light (exact match to living room)
+- **Staged Turn-Off Warnings**:
+  - Stage 1: Dim to 40% + warm to 1800K
+  - Stage 2: Dim to 20% + warm to 1800K
+  - Stage 3: Turn off with 3-second fade
+- **Manual Override** - Toggle via button/switch/input_boolean to keep lights on
+- **Philips Hue Compatible** - Color_temp mode (mireds)
+
+### Design Philosophy
+
+This blueprint solves a critical UX problem: **adjacent zones must have identical light color** to avoid jarring transitions. When you walk from the living room (managed by the Intelligent Living Room blueprint) into a hallway (managed by this blueprint), both lights must show the exact same color temperature at the exact same time.
+
+**How We Guarantee Consistency:**
+- Extracted the EXACT sun elevation → Kelvin formula from living room blueprint
+- Hardcoded lux thresholds (150/80) - users cannot change them
+- Hardcoded brightness curve - identical scaling
+- Hardcoded debounce times (120/300/600 sec)
+- Result: **Living room at 3500K = Hallway at 3500K** (always)
+
+**What's Different:**
+- Shorter turn-off intervals (5/10/15 min vs 30/40/45 min in living room)
+- Optimized for quick-transition spaces (not long-dwell spaces)
+- Zone preset system for easy configuration
+
+### Quick Start
+
+See [📖 Quick Start Guide](blueprints/ADJACENT_ZONE_QUICK_START.md) for 5-minute setup.
+
+**Recommended Configuration for Hallways:**
+```yaml
+zone_preset: "quick"  # 5/10/15 min intervals
+lux_sensor: sensor.hallway_illuminance
+motion_sensor: binary_sensor.hallway_motion
+override_entity: input_boolean.hallway_override
+```
+
+### Why Color Consistency Matters
+
+**Without Consistency:**
+- Living room shows 5500K cool white (midday sun)
+- Hallway shows 3000K warm white (different blueprint/settings)
+- Result: Jarring color shift when transitioning between rooms
+
+**With This Blueprint:**
+- Living room shows 5500K at 2pm (sun at 37°)
+- Hallway shows 5500K at 2pm (same formula, same sun position)
+- Result: Seamless, natural transition
+
+### Documentation
+
+- [📖 Quick Start](blueprints/ADJACENT_ZONE_QUICK_START.md) - 5-minute setup
+- [📘 Complete Setup Guide](blueprints/ADJACENT_ZONE_SETUP_GUIDE.md) - Zone configuration, advanced features
+- [🎨 Color Consistency Guide](blueprints/COLOR_CONSISTENCY_GUIDE.md) - Technical details on color matching
+
+### Zone Preset Recommendations
+
+| Zone Type | Preset | Turn-Off Intervals | Use Case |
+|-----------|--------|-------------------|----------|
+| **Closet** | Very Quick | 3/5/7 min | Quick in-and-out |
+| **Stairs** | Very Quick | 3/5/7 min | Brief transitions |
+| **Hallway** | Quick | 5/10/15 min | Short walks |
+| **Bathroom** | Quick | 5/10/15 min | Hand washing, quick visits |
+| **Powder Room** | Medium | 10/15/20 min | Longer visits |
+| **Utility Room** | Medium | 10/15/20 min | Laundry tasks |
+| **Garage** | Medium | 10/15/20 min | Unloading car |
 
 ---
 
