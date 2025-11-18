@@ -1,9 +1,10 @@
 blueprint:
-  name: Adjacent Zone Motion - Circadian Lighting v1.0
+  name: Adjacent Zone Motion - Circadian Lighting v1.1
   description: >
     Motion-activated lighting for hallways, bathrooms, and stairs with EXACT color
     consistency to the Intelligent Living Room blueprint. Features lux-aware control,
-    circadian rhythm, staged turn-off warnings, and zone-based timing presets.
+    circadian rhythm, staged turn-off warnings, zone-based timing presets, and
+    configurable brightness controls.
 
 
     This blueprint is OPTIMIZED for adjacent zones like hallways, bathrooms, stairs,
@@ -33,12 +34,13 @@ blueprint:
       flickering. Same anti-flicker system as living room for consistency.
 
 
-    - DYNAMIC BRIGHTNESS: Brightness scales inversely with ambient lux using IDENTICAL
-      curve as living room (50/75/100/125/150 lux breakpoints).
+    - CONFIGURABLE BRIGHTNESS: Fully adjustable brightness curve at 5 lux breakpoints
+      (50/75/100/125/150 lux). Configure stage warning brightness (40%/20% defaults).
+      Enable/disable dynamic brightness with toggle.
 
 
-    - STAGED TURN-OFF: Progressive warnings before lights turn off. Dim to 40% with
-      warm 1800K color, then 20%, then off. Same dimming behavior as living room.
+    - STAGED TURN-OFF: Progressive warnings before lights turn off. Configurable
+      dimming to warm 1800K color. Fully customizable brightness percentages.
 
 
     - MANUAL OVERRIDE: Button/switch/input_boolean support to keep lights on regardless
@@ -229,17 +231,131 @@ blueprint:
           mode: slider
 
     # ============================================================================
-    # SECTION 6: STAGED TURN-OFF (PROGRESSIVE WARNINGS)
+    # SECTION 6: DYNAMIC BRIGHTNESS CONTROL
+    # ============================================================================
+    dynamic_brightness_enabled:
+      name: Enable Dynamic Brightness
+      description: >
+        Automatically adjust brightness based on natural light levels. Brightness scales
+        inversely with lux (darker outside = brighter lights). Curve breakpoints below
+        provide fine-grained control. Recommended: ENABLED.
+      default: true
+      selector:
+        boolean:
+
+    # Dynamic brightness curve configuration
+    brightness_50_lux:
+      name: Brightness at ≤50 Lux (Very Dark)
+      description: >
+        Brightness level when very dark (≤50 lux). Default: 100% (full brightness in darkness).
+        Recommended: 100% for hallways/stairs safety, 80-90% for bathrooms/closets.
+      default: 100
+      selector:
+        number:
+          min: 40
+          max: 100
+          step: 5
+          unit_of_measurement: "%"
+          mode: slider
+
+    brightness_75_lux:
+      name: Brightness at 75 Lux
+      description: >
+        Brightness at 75 lux (dim indoor light). Default: 85%.
+        This should be slightly lower than 50 lux setting for smooth scaling.
+      default: 85
+      selector:
+        number:
+          min: 40
+          max: 100
+          step: 5
+          unit_of_measurement: "%"
+          mode: slider
+
+    brightness_100_lux:
+      name: Brightness at 100 Lux
+      description: >
+        Brightness at 100 lux (moderate indoor light). Default: 70%.
+        Lights dim further as natural light increases.
+      default: 70
+      selector:
+        number:
+          min: 40
+          max: 100
+          step: 5
+          unit_of_measurement: "%"
+          mode: slider
+
+    brightness_125_lux:
+      name: Brightness at 125 Lux
+      description: >
+        Brightness at 125 lux (bright indoor light). Default: 55%.
+        Near the OFF threshold - lights preparing to turn off.
+      default: 55
+      selector:
+        number:
+          min: 40
+          max: 100
+          step: 5
+          unit_of_measurement: "%"
+          mode: slider
+
+    brightness_150_lux:
+      name: Brightness at ≥150 Lux (Bright)
+      description: >
+        Brightness when bright (≥150 lux, at OFF threshold). Default: 40%.
+        Minimum brightness before lights turn off completely.
+      default: 40
+      selector:
+        number:
+          min: 20
+          max: 100
+          step: 5
+          unit_of_measurement: "%"
+          mode: slider
+
+    # ============================================================================
+    # SECTION 7: STAGED TURN-OFF (PROGRESSIVE WARNINGS)
     # ============================================================================
     staged_turnoff_enabled:
       name: Enable Staged Turn-Off
       description: >
         Enable progressive warnings before complete shut-off. Prevents jarring sudden
-        darkness. Three stages with timing based on zone preset. Dimming percentages
-        (40%/20%) match living room for consistency. Recommended: ENABLED.
+        darkness. Three stages with timing based on zone preset. Configure dimming
+        brightness percentages below. Recommended: ENABLED.
       default: true
       selector:
         boolean:
+
+    stage_1_brightness:
+      name: Stage 1 Warning Brightness
+      description: >
+        Brightness for first warning (also shifts to 1800K warm color). Default: 40%.
+        This is the first "lights about to turn off" signal. Increase for more visibility
+        during warning period.
+      default: 40
+      selector:
+        number:
+          min: 10
+          max: 60
+          step: 5
+          unit_of_measurement: "%"
+          mode: slider
+
+    stage_2_brightness:
+      name: Stage 2 Warning Brightness
+      description: >
+        Brightness for second warning (maintains 1800K warm color). Default: 20%.
+        This is the final "last chance" warning before complete turn-off. Very low
+        brightness to signal imminent shut-off.
+      default: 20
+      selector:
+        number:
+          min: 5
+          max: 40
+          step: 5
+          unit_of_measurement: "%"
+          mode: slider
 
 # Automation mode: restart ensures clean state management
 # If motion detected during any stage, automation restarts from beginning
@@ -309,9 +425,18 @@ variables:
   lux_off_debounce_sec: 300     # 5 minutes OFF debounce
   sunrise_sunset_debounce_sec: 600  # 10 minutes extended debounce
 
-  # === DIMMING PERCENTAGES (HARDCODED TO MATCH LIVING ROOM) ===
-  stage_1_brightness_pct: 40    # First warning: 40% brightness
-  stage_2_brightness_pct: 20    # Second warning: 20% brightness
+  # === BRIGHTNESS SETTINGS (USER CONFIGURABLE) ===
+  # Dynamic brightness toggle and curve values
+  dynamic_brightness: !input dynamic_brightness_enabled
+  brightness_at_50_lux: !input brightness_50_lux
+  brightness_at_75_lux: !input brightness_75_lux
+  brightness_at_100_lux: !input brightness_100_lux
+  brightness_at_125_lux: !input brightness_125_lux
+  brightness_at_150_lux: !input brightness_150_lux
+
+  # Staged turn-off dimming percentages
+  stage_1_brightness_pct: !input stage_1_brightness
+  stage_2_brightness_pct: !input stage_2_brightness
 
   # === FEATURE FLAGS ===
   override_system_enabled: !input override_enabled
@@ -366,32 +491,37 @@ variables:
       false
     {% endif %}
 
-  # === DYNAMIC BRIGHTNESS CALCULATION (HARDCODED CURVE - MATCHES LIVING ROOM) ===
+  # === DYNAMIC BRIGHTNESS CALCULATION ===
   # Brightness scales inversely with lux (brighter outside = dimmer lights)
-  # Uses IDENTICAL breakpoints as living room blueprint for consistency
+  # Uses same breakpoints as living room blueprint, but user-configurable values
   calculated_brightness: >
-    {% set lux = current_lux | float %}
-    {% if lux <= 50 %}
-      100
-    {% elif lux <= 75 %}
-      {# Linear interpolation between 50 and 75 lux #}
-      {% set range_pct = (lux - 50) / 25 %}
-      {{ (100 - (100 - 85) * range_pct) | int }}
-    {% elif lux <= 100 %}
-      {# Linear interpolation between 75 and 100 lux #}
-      {% set range_pct = (lux - 75) / 25 %}
-      {{ (85 - (85 - 70) * range_pct) | int }}
-    {% elif lux <= 125 %}
-      {# Linear interpolation between 100 and 125 lux #}
-      {% set range_pct = (lux - 100) / 25 %}
-      {{ (70 - (70 - 55) * range_pct) | int }}
-    {% elif lux <= 150 %}
-      {# Linear interpolation between 125 and 150 lux #}
-      {% set range_pct = (lux - 125) / 25 %}
-      {{ (55 - (55 - 40) * range_pct) | int }}
+    {% if dynamic_brightness %}
+      {% set lux = current_lux | float %}
+      {% if lux <= 50 %}
+        {{ brightness_at_50_lux }}
+      {% elif lux <= 75 %}
+        {# Linear interpolation between 50 and 75 lux #}
+        {% set range_pct = (lux - 50) / 25 %}
+        {{ (brightness_at_50_lux - (brightness_at_50_lux - brightness_at_75_lux) * range_pct) | int }}
+      {% elif lux <= 100 %}
+        {# Linear interpolation between 75 and 100 lux #}
+        {% set range_pct = (lux - 75) / 25 %}
+        {{ (brightness_at_75_lux - (brightness_at_75_lux - brightness_at_100_lux) * range_pct) | int }}
+      {% elif lux <= 125 %}
+        {# Linear interpolation between 100 and 125 lux #}
+        {% set range_pct = (lux - 100) / 25 %}
+        {{ (brightness_at_100_lux - (brightness_at_100_lux - brightness_at_125_lux) * range_pct) | int }}
+      {% elif lux <= 150 %}
+        {# Linear interpolation between 125 and 150 lux #}
+        {% set range_pct = (lux - 125) / 25 %}
+        {{ (brightness_at_125_lux - (brightness_at_125_lux - brightness_at_150_lux) * range_pct) | int }}
+      {% else %}
+        {# Above 150 lux - use minimum brightness #}
+        {{ brightness_at_150_lux }}
+      {% endif %}
     {% else %}
-      {# Above 150 lux - use minimum brightness #}
-      40
+      {# Dynamic brightness disabled - use 100% #}
+      100
     {% endif %}
 
   # === CIRCADIAN COLOR TEMPERATURE CALCULATION (SUN-AWARE) ===
