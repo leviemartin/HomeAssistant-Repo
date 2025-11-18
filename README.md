@@ -32,8 +32,8 @@ https://raw.githubusercontent.com/leviemartin/HomeAssistant-Repo/main/blueprints
 
 [📖 Quick Start](blueprints/INTELLIGENT_LIVING_ROOM_QUICK_START.md) | [📘 Complete Setup Guide](blueprints/INTELLIGENT_LIVING_ROOM_SETUP_GUIDE.md) | [🔬 Anti-Flicker Technical Guide](blueprints/ANTI_FLICKER_TECHNICAL_GUIDE.md) | [📡 FP2 Features Reference](blueprints/FP2_FEATURES_REFERENCE.md)
 
-### 4. Adjacent Zone Motion Sensor with Circadian Lighting ⭐ NEW
-Motion-activated lighting for hallways, bathrooms, and stairs with GUARANTEED color consistency to the living room blueprint. Uses identical circadian formulas (1800K-5500K) but with shorter turn-off intervals perfect for quick-transition spaces. Features zone presets (Very Quick/Quick/Medium) and anti-flicker protection.
+### 4. Adjacent Zone Motion Sensor with Circadian Lighting ⭐ NEW v1.1
+Motion-activated lighting for hallways, bathrooms, and stairs with GUARANTEED color consistency to the living room blueprint. Uses identical circadian formulas (1800K-5500K) but with shorter turn-off intervals perfect for quick-transition spaces. Features zone presets (Very Quick/Quick/Medium), anti-flicker protection, and **NEW: Configurable Brightness Controls** (adjust brightness curve and stage dimming percentages).
 
 **Import URL:**
 ```
@@ -281,7 +281,7 @@ Result: No flicker, smooth operation, natural feel.
 
 ---
 
-## Adjacent Zone Motion Sensor with Circadian Lighting ⭐ NEW
+## Adjacent Zone Motion Sensor with Circadian Lighting ⭐ NEW v1.1
 
 ### Key Features
 
@@ -300,10 +300,14 @@ Result: No flicker, smooth operation, natural feel.
   - Hysteresis: 150 lux OFF / 80 lux ON (50 lux dead band)
   - Debouncing: 5 min before OFF, 2 min before ON
   - Extended sunrise/sunset debounce (10 minutes)
-- **Dynamic Brightness Scaling** - Inverse relationship with natural light (exact match to living room)
+- **Configurable Brightness Controls (NEW v1.1)**:
+  - Dynamic brightness enable/disable toggle
+  - Adjustable brightness curve at 5 lux breakpoints (50/75/100/125/150 lux)
+  - Customizable stage warning brightness (defaults: 40%/20%)
+  - Same functionality as living room blueprint
 - **Staged Turn-Off Warnings**:
-  - Stage 1: Dim to 40% + warm to 1800K
-  - Stage 2: Dim to 20% + warm to 1800K
+  - Stage 1: Configurable brightness (default 40%) + warm to 1800K
+  - Stage 2: Configurable brightness (default 20%) + warm to 1800K
   - Stage 3: Turn off with 3-second fade
 - **Manual Override** - Toggle via button/switch/input_boolean to keep lights on
 - **Philips Hue Compatible** - Color_temp mode (mireds)
