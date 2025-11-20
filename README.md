@@ -32,8 +32,8 @@ https://raw.githubusercontent.com/leviemartin/HomeAssistant-Repo/main/blueprints
 
 [📖 Quick Start](blueprints/INTELLIGENT_LIVING_ROOM_QUICK_START.md) | [📘 Complete Setup Guide](blueprints/INTELLIGENT_LIVING_ROOM_SETUP_GUIDE.md) | [🔬 Anti-Flicker Technical Guide](blueprints/ANTI_FLICKER_TECHNICAL_GUIDE.md) | [📡 FP2 Features Reference](blueprints/FP2_FEATURES_REFERENCE.md)
 
-### 4. Adjacent Zone Motion Sensor with Circadian Lighting ⭐ v1.3
-Motion-activated lighting for hallways, bathrooms, and stairs with GUARANTEED color consistency to the living room blueprint. Uses identical circadian formulas (1800K-5500K) with hardcoded Quick timing (5/10/15 min) optimized for quick-transition spaces. **CRITICAL FIX v1.3:** Complete rewrite for PIR sensor compatibility (Philips Hue, Aqara P1) - uses wait_for_trigger pattern instead of monitoring loop to handle PIR cooldown behavior. **Now Actually Works!**
+### 4. Adjacent Zone Motion Sensor with Circadian Lighting ⭐ v1.4
+Motion-activated lighting for hallways, bathrooms, and stairs with GUARANTEED color consistency to the living room blueprint. Uses identical circadian formulas (1800K-5500K) with hardcoded Quick timing (5/10/15 min = 15 min total) optimized for quick-transition spaces. **CRITICAL FIX v1.4:** Removes debounce wait that prevented lights from turning on when lux fluctuated. **Now turns on immediately AND turns off reliably!**
 
 **Import URL:**
 ```
@@ -298,17 +298,17 @@ Result: No flicker, smooth operation, natural feel.
 
 ---
 
-## Adjacent Zone Motion Sensor with Circadian Lighting ⭐ v1.3
+## Adjacent Zone Motion Sensor with Circadian Lighting ⭐ v1.4
 
 ### Key Features
 
 - **100% Color Consistency** - Extracted IDENTICAL circadian formulas from living room blueprint
 - **Hardcoded Lux Thresholds** - 150/80 lux (not configurable) for guaranteed matching
 - **Hardcoded Quick Timing** - 5/10/15 minutes (simplified, no presets)
-  - 15 min initial wait (motion must clear completely)
+  - 5 min initial wait (motion must clear completely)
   - 5 min Stage 1 delay (40% brightness, 1800K warm)
   - 5 min Stage 2 delay (20% brightness, 1800K warm)
-  - Total: 25 minutes from last motion to lights off
+  - Total: 15 minutes from last motion to lights off
   - Optimized for hallways and bathrooms
 - **Sun-Aware Circadian Rhythm**:
   - 1800K-5500K based on sun elevation
@@ -328,14 +328,17 @@ Result: No flicker, smooth operation, natural feel.
   - Stage 2: Configurable brightness (default 20%) + warm to 1800K
   - Stage 3: Turn off with 3-second fade
 - **Manual Override** - Toggle via button/switch/input_boolean to keep lights on
-- **CRITICAL FIX (v1.3)** ⚠️ COMPLETE REWRITE:
-  - ✅ **ROOT CAUSE FIXED**: v1.1/v1.2 used monitoring loop pattern designed for mmWave sensors
-  - ✅ **PIR Sensors Now Work**: Philips Hue and Aqara P1 have 1-2 min hardware cooldown
-  - ✅ **New Pattern**: wait_for_trigger watches for NEW motion events, ignores PIR cooldown
-  - ✅ **Simplified**: Removed preset system, hardcoded Quick timing (5/10/15 min)
-  - ✅ **24% Code Reduction**: 861 lines → 655 lines
-  - ✅ **Actually Works Now**: Lights turn off after 25 min of no motion
-  - ❌ v1.1/v1.2 bug: PIR cooldown caused infinite restart loop → lights stayed on forever
+- **CRITICAL FIX (v1.4)** ⚠️ TURN-ON NOW WORKS:
+  - ✅ **v1.4 Fix**: Removed debounce wait that prevented lights from turning on
+  - ✅ **Immediate Response**: Lights turn on instantly when motion detected (if lux < 80)
+  - ✅ **No Timeouts**: Simple condition check can't fail or timeout
+  - ✅ **Faster Turn-Off**: 15 minutes total (reduced from 25 min in v1.3)
+- **Previous Fixes (v1.3)**:
+  - ✅ **ROOT CAUSE FIXED**: v1.1/v1.2 used monitoring loop designed for mmWave sensors
+  - ✅ **PIR Sensors Now Work**: wait_for_trigger ignores PIR 1-2 min hardware cooldown
+  - ✅ **Simplified Code**: 24% reduction (861 → 655 lines)
+  - ❌ v1.1/v1.2 bug: PIR cooldown caused infinite restart loop
+  - ❌ v1.3 bug: Debounce wait prevented lights from turning on
 - **Philips Hue Compatible** - Color_temp mode (mireds)
 - **PIR Motion Sensor Compatible** ⭐ - Philips Hue, Aqara P1, generic PIR (also works with mmWave)
 
@@ -392,14 +395,23 @@ override_entity: input_boolean.hallway_override
 | Event | Timing | What Happens |
 |-------|--------|--------------|
 | **Motion Detected** | T+0 | Lights turn ON (100%, circadian color) |
-| **Motion Clears** | T+0 to T+15 | Wait for new motion (or timeout) |
-| **Stage 1 Warning** | T+15 | Dim to 40% + warm to 1800K |
-| **Stage 2 Warning** | T+20 | Dim to 20% + warm to 1800K |
-| **Lights OFF** | T+25 | Turn off with 3-second fade |
+| **Motion Clears** | T+0 to T+5 | Wait for new motion (or timeout) |
+| **Stage 1 Warning** | T+5 | Dim to 40% + warm to 1800K |
+| **Stage 2 Warning** | T+10 | Dim to 20% + warm to 1800K |
+| **Lights OFF** | T+15 | Turn off with 3-second fade |
 
 **If motion detected during any stage:** Automation restarts from T+0 (lights back to 100%)
 
-### Recent Enhancements (v1.3) ⭐ COMPLETE REWRITE
+### Recent Enhancements (v1.4) ⭐ TURN-ON NOW WORKS + FASTER TURN-OFF
+
+- ✅ **CRITICAL FIX**: Removed debounce wait that prevented lights from turning on
+- ✅ **Immediate Response**: Lights now turn on instantly when motion detected (if lux < 80)
+- ✅ **No Timeouts**: Simple condition check can't fail or timeout like v1.3
+- ✅ **Faster Turn-Off**: 15 minutes total (reduced from 25 min in v1.3)
+- ✅ **User-Requested Timing**: 5 min initial wait instead of 15 min
+- ✅ **Actually Reliable**: Both turn-on AND turn-off work perfectly with PIR sensors
+
+### Previous Enhancements (v1.3) - COMPLETE REWRITE
 
 - ✅ **ROOT CAUSE IDENTIFIED**: v1.1/v1.2 used monitoring loop designed for mmWave sensors
 - ✅ **PIR Cooldown Handling**: PIR sensors go "OFF" after 1-2 min (hardware behavior)
@@ -407,7 +419,7 @@ override_entity: input_boolean.hallway_override
 - ✅ **Simplified Code**: Removed preset system (Very Quick/Medium/Custom)
 - ✅ **Hardcoded Timing**: Quick preset only (5/10/15 min)
 - ✅ **24% Smaller**: 861 lines → 655 lines
-- ✅ **Actually Works**: Lights turn off after 25 min of no motion (tested with Philips Hue & Aqara P1)
+- ❌ **v1.3 Bug**: Debounce wait prevented lights from turning on reliably
 
 ### Previous Attempts (v1.1/v1.2) - FAILED
 
