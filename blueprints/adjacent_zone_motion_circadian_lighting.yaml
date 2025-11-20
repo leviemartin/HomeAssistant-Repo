@@ -1,14 +1,15 @@
 blueprint:
-  name: Adjacent Zone Motion - Circadian Lighting v1.3
+  name: Adjacent Zone Motion - Circadian Lighting v1.4
   description: >
     Motion-activated lighting for hallways, bathrooms, and stairs with EXACT color
     consistency to the Intelligent Living Room blueprint. Features lux-aware control,
     circadian rhythm, staged turn-off warnings, and configurable brightness controls.
 
 
-    This is v1.3 - CRITICAL ARCHITECTURE REWRITE: Fixes PIR sensor compatibility issue
-    that caused lights to stay on indefinitely. Simplified to single timing preset
-    (5/10/15 min) optimized for hallways and bathrooms.
+    This is v1.4 - CRITICAL BUG FIX: Removes debounce wait on turn-ON that was
+    preventing lights from turning on when lux fluctuated during the 2-minute wait
+    period. Simplified turn-on logic for immediate response while maintaining all
+    anti-flicker protection via simple threshold checks.
 
 
     This blueprint is OPTIMIZED for adjacent zones like hallways, bathrooms, stairs,
@@ -35,8 +36,9 @@ blueprint:
       Seamless color matching when walking between rooms (1800K-5500K range).
 
 
-    - LUX-AWARE HYSTERESIS: Hardcoded thresholds (150/80 lux) with debounce prevent
-      flickering. Same anti-flicker system as living room for consistency.
+    - LUX-AWARE HYSTERESIS: Hardcoded thresholds (150/80 lux) prevent flickering.
+      v1.4 uses simple condition checks instead of debounce waits for immediate
+      turn-on response. Anti-flicker protection maintained via threshold separation.
 
 
     - CONFIGURABLE BRIGHTNESS: Fully adjustable brightness curve at 5 lux breakpoints
@@ -53,7 +55,7 @@ blueprint:
 
 
     - SUNRISE/SUNSET SMART: Extended 10-minute debounce during dawn/dusk prevents
-      oscillation from rapidly changing natural light.
+      oscillation from rapidly changing natural light (applied only to turn-OFF).
 
 
     PERFECT FOR: Hallways, bathrooms, stairs, closets, laundry rooms, garages, any
@@ -64,10 +66,10 @@ blueprint:
     and standard illuminance sensors.
 
 
-    v1.3 CHANGELOG: Complete architecture rewrite to fix PIR sensor compatibility.
-    Removed preset complexity - now single hardcoded timing (5/10/15 min). Uses
-    wait_for_trigger pattern instead of monitoring loop for reliable turn-off with
-    PIR sensors that have 1-2 minute cooldown periods.
+    v1.4 CHANGELOG: CRITICAL FIX - Removed debounce wait on turn-ON (lines 543-546
+    in v1.3) that was causing lights to fail to turn on when lux fluctuated during
+    the 2-minute wait. Simplified to immediate turn-on with simple lux threshold
+    check. Debounce is only needed for turn-OFF to prevent flicker, not turn-ON.
 
   domain: automation
   source_url: https://github.com/martinlevie/HomeAssistant-Repo/blueprints/adjacent_zone_motion_circadian_lighting.yaml
@@ -328,9 +330,8 @@ variables:
   # to ensure consistent anti-flicker behavior across all zones
   lux_on_threshold: 80          # Turn ON when lux drops below 80
   lux_off_threshold: 150        # Turn OFF when lux rises above 150
-  lux_on_debounce_sec: 120      # 2 minutes ON debounce
-  lux_off_debounce_sec: 300     # 5 minutes OFF debounce
-  sunrise_sunset_debounce_sec: 600  # 10 minutes extended debounce
+  lux_off_debounce_sec: 300     # 5 minutes OFF debounce (still used for turn-OFF)
+  sunrise_sunset_debounce_sec: 600  # 10 minutes extended debounce (for turn-OFF)
 
   # === BRIGHTNESS SETTINGS (USER CONFIGURABLE) ===
   # Dynamic brightness toggle and curve values
@@ -382,6 +383,7 @@ variables:
 
   # === SMART DEBOUNCE SELECTION ===
   # Use extended debounce during sunrise/sunset, normal debounce otherwise
+  # NOTE: This is only used for turn-OFF logic now, not turn-ON
   effective_off_debounce: >
     {% if is_dawn_or_dusk %}
       {{ sunrise_sunset_debounce_sec }}
@@ -510,19 +512,23 @@ action:
               level: info
 
       # ======================================================================
-      # BRANCH 2: MOTION DETECTED (MAIN LOGIC - REWRITTEN FOR v1.3)
+      # BRANCH 2: MOTION DETECTED (MAIN LOGIC - v1.4 SIMPLIFIED TURN-ON)
       # ======================================================================
       - conditions:
           - condition: trigger
             id: motion_detected
         sequence:
-          # === STEP 1: LUX HYSTERESIS CHECK (ANTI-FLICKER LOGIC) ===
-          # Only turn on if:
+          # === STEP 1: TURN ON LIGHTS (SIMPLIFIED - v1.4 CRITICAL FIX) ===
+          # v1.4 CHANGE: Removed the debounce wait that was preventing lights from
+          # turning on. Debounce is only needed for turn-OFF to prevent flicker.
+          # For turn-ON, we just check lux threshold once at trigger time.
+          #
+          # Turn on if:
           # 1. Override is active (ignore lux), OR
-          # 2. Lux is below ON threshold (after debounce)
+          # 2. Lux is below ON threshold (80 lux)
 
           - choose:
-              # Override active - turn on immediately regardless of lux
+              # === OPTION A: Override active - turn on immediately ===
               - conditions:
                   - condition: template
                     value_template: "{{ override_active }}"
@@ -534,18 +540,11 @@ action:
                       color_temp: "{{ color_temp_mireds }}"
                       transition: 2
 
-              # Override not active - check lux hysteresis
+              # === OPTION B: Lux below threshold - turn on immediately ===
               - conditions:
                   - condition: template
                     value_template: "{{ current_lux < lux_on_threshold }}"
                 sequence:
-                  # Lux is below ON threshold - wait for debounce before turning on
-                  - wait_template: "{{ states(lux_sensor_entity) | float < lux_on_threshold }}"
-                    timeout:
-                      seconds: "{{ lux_on_debounce_sec }}"
-                    continue_on_timeout: false
-
-                  # Debounce passed - turn on lights
                   - service: light.turn_on
                     target: !input target_lights
                     data:
@@ -555,21 +554,21 @@ action:
 
             # If neither condition met (lux too high, no override) - do nothing and exit
 
-          # === STEP 2: WAIT FOR MOTION TO CLEAR (v1.3 NEW APPROACH) ===
+          # === STEP 2: WAIT FOR MOTION TO CLEAR (v1.3 PIR-COMPATIBLE APPROACH) ===
           # This is the CRITICAL FIX for PIR sensor compatibility.
           # Instead of a monitoring loop, we use wait_for_trigger with timeout.
           #
           # WHY THIS WORKS WITH PIR SENSORS:
           # - PIR goes "on" briefly when motion detected (trigger fires)
           # - PIR automatically goes "off" after 1-2 min cooldown
-          # - We wait for stage_3_delay_sec (15 min) for ANY new motion
+          # - We wait for stage_1_delay_sec (5 min) for ANY new motion
           # - If new motion detected during wait → automation RESTARTS (mode: restart)
-          # - If wait completes (15 min with no motion) → proceed to turn-off
+          # - If wait completes (5 min with no motion) → proceed to turn-off
           #
           # This handles PIR cooldown correctly:
           # - Initial motion → trigger → lights on
           # - PIR goes "off" after 1 min (cooldown) → we ignore this
-          # - We wait 15 min for NEW motion trigger
+          # - We wait 5 min for NEW motion trigger
           # - If person still present → they'll trigger motion again → restart
           # - If person actually left → no new triggers → turn off
 
@@ -578,7 +577,7 @@ action:
                 entity_id: !input motion_sensor
                 to: "on"
             timeout:
-              seconds: "{{ stage_3_delay_sec }}"  # 15 minutes total
+              seconds: "{{ stage_1_delay_sec }}"  # 5 minutes
             continue_on_timeout: true
 
           # === STEP 3: CHECK IF MOTION DETECTED DURING WAIT ===
@@ -595,7 +594,7 @@ action:
                     value_template: "{{ staged_turnoff }}"
                 sequence:
                   # === STAGE 1: DIM TO 40% + WARM TO 1800K ===
-                  # We already waited 5 minutes (as part of the 15 min total wait above)
+                  # We already waited 5 minutes (initial wait above)
                   # So we execute Stage 1 immediately
                   - service: light.turn_on
                     target: !input target_lights
@@ -604,7 +603,7 @@ action:
                       color_temp: "{{ warning_color_temp_mireds }}"
                       transition: 3
 
-                  # Wait for Stage 2 (5 more minutes, 10 min total since motion cleared)
+                  # Wait for Stage 2 (5 more minutes)
                   - wait_for_trigger:
                       - platform: state
                         entity_id: !input motion_sensor
@@ -624,7 +623,7 @@ action:
                       color_temp: "{{ warning_color_temp_mireds }}"
                       transition: 3
 
-                  # Wait for Stage 3 (5 more minutes, 15 min total since motion cleared)
+                  # Wait for Stage 3 (5 more minutes)
                   - wait_for_trigger:
                       - platform: state
                         entity_id: !input motion_sensor
@@ -643,7 +642,7 @@ action:
                       transition: 3
 
             # === STAGED TURN-OFF DISABLED ===
-            # Simple immediate turn-off after initial 15 min wait
+            # Simple immediate turn-off after initial 5 min wait
             default:
               - service: light.turn_off
                 target: !input target_lights
