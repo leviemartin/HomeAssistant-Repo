@@ -22,8 +22,8 @@ https://raw.githubusercontent.com/leviemartin/HomeAssistant-Repo/main/blueprints
 
 [📖 Quick Start Guide](blueprints/QUICK_START.md) | [🔬 Scientific Details](blueprints/SUN_AWARE_UPGRADE_GUIDE.md) | [⚖️ Feature Comparison](blueprints/FEATURE_COMPARISON.md)
 
-### 3. Intelligent Living Room Lighting (mmWave + Lux Aware) ⭐ NEW v1.1
-Advanced living room automation with Aqara FP2 mmWave presence detection, natural light awareness, and anti-flicker protection. Features sun-aware circadian rhythm integration, dynamic brightness scaling, staged turn-off warnings, and **NEW: Scene Cycling** (cycle through 3 Philips Hue scenes with one button).
+### 3. Intelligent Living Room Lighting (mmWave + Lux Aware) ⭐ v1.2
+Advanced living room automation with Aqara FP2 mmWave presence detection, natural light awareness, and anti-flicker protection. Features sun-aware circadian rhythm integration, dynamic brightness scaling, staged turn-off warnings, scene cycling (cycle through 3 Philips Hue scenes), and **NEW v1.2: Night Mode Fast Shutdown** (5/7/10 min turn-off after 10pm vs 30/40/45 min normally). **CRITICAL FIXES:** Circadian colors and brightness now update properly during continuous occupancy.
 
 **Import URL:**
 ```
@@ -205,7 +205,7 @@ evening_latest: "20:30:00"
 
 ---
 
-## Intelligent Living Room Lighting ⭐ NEW
+## Intelligent Living Room Lighting ⭐ v1.2
 
 ### Key Features
 
@@ -227,10 +227,19 @@ evening_latest: "20:30:00"
   - 40 min: Dim to 20% + warm to 1800K (strong warning)
   - 45 min: Turn off with 3-second fade
 - **Easy Override System** - Toggle via button/switch/input_boolean to keep lights on regardless of lux
-- **Scene Cycling (NEW v1.1)** - Single button cycles through 3 Hue scenes (Movie → Reading → Party → Off)
+- **Scene Cycling** - Single button cycles through 3 Hue scenes (Movie → Reading → Party → Off)
   - Smart scene skipping (disabled scenes automatically skipped)
   - State persists across HA restarts
   - Optional presence timeout bypass
+- **Night Mode Fast Shutdown (NEW v1.2)** - Configurable faster turn-off after hours
+  - Default: 5/7/10 min delays after 22:00 (vs 30/40/45 min normally)
+  - Configurable start/end times
+  - Perfect for bedtime - no more waiting 45 minutes for lights to turn off
+  - Automatic midnight crossing support
+- **CRITICAL FIXES (v1.2)**:
+  - ✅ Circadian colors now update every 60 seconds during occupancy
+  - ✅ Dynamic brightness now updates every 60 seconds with changing lux
+  - ✅ Fixed stale variable bug preventing continuous updates
 - **Philips Hue Compatible** - Color_temp mode (mireds) + Scene integration
 
 ### Quick Start
@@ -265,13 +274,21 @@ Result: No flicker, smooth operation, natural feel.
 - [🔬 Anti-Flicker Technical Guide](blueprints/ANTI_FLICKER_TECHNICAL_GUIDE.md) - Deep dive into hysteresis logic
 - [📡 FP2 Features Reference](blueprints/FP2_FEATURES_REFERENCE.md) - Aqara FP2 capabilities
 
-### Recent Enhancements (v1.1)
+### Recent Enhancements (v1.2) ⭐ CRITICAL UPDATE
+
+- ✅ **CRITICAL FIX: Circadian Updates** - Colors now properly update every 60 seconds during occupancy
+- ✅ **CRITICAL FIX: Brightness Updates** - Brightness now properly adjusts with changing lux
+- ✅ **Night Mode Fast Shutdown** - Configurable 5/7/10 min turn-off after 22:00 (vs 30/40/45 min)
+- ✅ **Midnight Crossing Support** - Night mode properly handles 22:00-06:00 time windows
+- ✅ **Bug Fix: Branch 4 Trigger** - Fixed broken time_pattern condition
+
+### Previous Enhancements (v1.1)
 
 - ✅ **Scene Cycling** - Cycle through 3 Philips Hue scenes with single button
 - ✅ **State Persistence** - Scene state survives HA restarts via input_number helper
 - ✅ **Smart Skipping** - Automatically skips disabled scenes in cycle
 
-### Future Enhancements (v1.2+)
+### Future Enhancements (v1.3+)
 
 - Night Lights Mode (separate late-night settings)
 - Adaptive Lighting Detection (pause on manual changes)
