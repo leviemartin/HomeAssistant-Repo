@@ -1,12 +1,12 @@
 blueprint:
-  name: Intelligent Living Room - mmWave + Lux-Aware v1.1
+  name: Intelligent Living Room - mmWave + Lux-Aware v1.2
   description: >
     Professional-grade lighting automation combining mmWave presence detection,
     lux-aware hysteresis anti-flicker logic, staged turn-off sequences, dynamic
     brightness adjustment, sun-aware circadian rhythm, and Philips Hue scene cycling.
 
 
-    This is v1.1 - adds scene cycling feature with single-button override control.
+    This is v1.2 - fixes circadian/brightness updates during occupancy + adds night mode fast shutdown.
 
 
     KEY FEATURES:
@@ -557,6 +557,79 @@ blueprint:
           unit_of_measurement: seconds
           mode: slider
 
+    # ============================================================================
+    # SECTION 8: NIGHT MODE (FAST SHUTDOWN AFTER HOURS)
+    # ============================================================================
+    night_mode_enabled:
+      name: Enable Night Mode Fast Shutdown
+      description: >
+        Enable faster staged turn-off after a specified time (e.g., 10pm bedtime).
+        When enabled, uses shorter delays for quicker response to no presence during
+        late evening hours. Perfect for bedtime routines when you want lights to turn
+        off faster. Recommended: ENABLED.
+      default: true
+      selector:
+        boolean:
+
+    night_mode_start_time:
+      name: Night Mode Start Time
+      description: >
+        Time when night mode fast shutdown begins (24-hour format). Default: 22:00 (10pm).
+        After this time, staged turn-off uses night mode delays instead of normal delays.
+      default: "22:00:00"
+      selector:
+        time:
+
+    night_mode_end_time:
+      name: Night Mode End Time
+      description: >
+        Time when night mode ends (24-hour format). Default: 06:00 (6am). Between
+        end time and start time, normal staged turn-off delays are used.
+      default: "06:00:00"
+      selector:
+        time:
+
+    night_stage_1_delay:
+      name: Night Mode Stage 1 Delay
+      description: >
+        Stage 1 delay during night mode (first warning). Default: 5 minutes (300 seconds).
+        Much faster than normal mode for quicker response at bedtime.
+      default: 300
+      selector:
+        number:
+          min: 60
+          max: 1800
+          step: 60
+          unit_of_measurement: seconds
+          mode: slider
+
+    night_stage_2_delay:
+      name: Night Mode Stage 2 Delay
+      description: >
+        Stage 2 delay during night mode (second warning). Default: 7 minutes (420 seconds).
+      default: 420
+      selector:
+        number:
+          min: 120
+          max: 2400
+          step: 60
+          unit_of_measurement: seconds
+          mode: slider
+
+    night_stage_3_delay:
+      name: Night Mode Stage 3 Delay
+      description: >
+        Stage 3 delay during night mode (complete turn-off). Default: 10 minutes (600 seconds).
+        Lights turn off completely after this duration with no presence.
+      default: 600
+      selector:
+        number:
+          min: 180
+          max: 3000
+          step: 60
+          unit_of_measurement: seconds
+          mode: slider
+
 # Automation mode: restart ensures clean state management
 # If presence detected during any stage, automation restarts from beginning
 mode: restart
@@ -622,6 +695,54 @@ variables:
   stage_2_delay_sec: !input stage_2_delay
   stage_2_brightness_pct: !input stage_2_brightness
   stage_3_delay_sec: !input stage_3_delay
+
+  # === NIGHT MODE CONFIGURATION ===
+  night_mode_enabled_flag: !input night_mode_enabled
+  night_mode_start: !input night_mode_start_time
+  night_mode_end: !input night_mode_end_time
+  night_stage_1_delay_sec: !input night_stage_1_delay
+  night_stage_2_delay_sec: !input night_stage_2_delay
+  night_stage_3_delay_sec: !input night_stage_3_delay
+
+  # === NIGHT MODE ACTIVE CHECK ===
+  # Check if current time is within night mode window
+  is_night_mode_active: >
+    {% if night_mode_enabled_flag %}
+      {% set current_time = now().strftime('%H:%M:%S') %}
+      {% set start = night_mode_start %}
+      {% set end = night_mode_end %}
+      {% if start < end %}
+        {# Normal case: start before midnight, end after midnight (e.g., 22:00 to 06:00 next day) #}
+        {{ current_time >= start or current_time < end }}
+      {% else %}
+        {# Crossing midnight case: start after end (e.g., 22:00 to 06:00) #}
+        {{ current_time >= start or current_time < end }}
+      {% endif %}
+    {% else %}
+      false
+    {% endif %}
+
+  # === EFFECTIVE STAGED DELAYS (SWITCHES BASED ON NIGHT MODE) ===
+  effective_stage_1_delay: >
+    {% if is_night_mode_active %}
+      {{ night_stage_1_delay_sec }}
+    {% else %}
+      {{ stage_1_delay_sec }}
+    {% endif %}
+
+  effective_stage_2_delay: >
+    {% if is_night_mode_active %}
+      {{ night_stage_2_delay_sec }}
+    {% else %}
+      {{ stage_2_delay_sec }}
+    {% endif %}
+
+  effective_stage_3_delay: >
+    {% if is_night_mode_active %}
+      {{ night_stage_3_delay_sec }}
+    {% else %}
+      {{ stage_3_delay_sec }}
+    {% endif %}
 
   # === CURRENT LUX READING ===
   current_lux: "{{ states(lux_sensor_entity) | float(0) }}"
@@ -1024,7 +1145,7 @@ action:
                   # === STAGED TURN-OFF SEQUENCE ===
                   # Stage 1: Wait, then dim to 40% + warm to 1800K
                   - delay:
-                      seconds: "{{ stage_1_delay_sec }}"
+                      seconds: "{{ effective_stage_1_delay }}"
 
                   - service: light.turn_on
                     target: !input target_lights
@@ -1035,7 +1156,7 @@ action:
 
                   # Stage 2: Wait, then dim to 20% (keep 1800K)
                   - delay:
-                      seconds: "{{ stage_2_delay_sec - stage_1_delay_sec }}"
+                      seconds: "{{ effective_stage_2_delay - effective_stage_1_delay }}"
 
                   - service: light.turn_on
                     target: !input target_lights
@@ -1046,7 +1167,7 @@ action:
 
                   # Stage 3: Wait, then turn off completely
                   - delay:
-                      seconds: "{{ stage_3_delay_sec - stage_2_delay_sec }}"
+                      seconds: "{{ effective_stage_3_delay - effective_stage_2_delay }}"
 
                   - service: light.turn_off
                     target: !input target_lights
@@ -1056,7 +1177,7 @@ action:
             default:
               # Staged turn-off disabled - simple turn-off after stage 3 delay
               - delay:
-                  seconds: "{{ stage_3_delay_sec }}"
+                  seconds: "{{ effective_stage_3_delay }}"
 
               - service: light.turn_off
                 target: !input target_lights
@@ -1133,6 +1254,80 @@ action:
                   entity_id: !input presence_sensor
                   state: "on"
 
+                # === RECALCULATE DYNAMIC VALUES FOR THIS ITERATION ===
+                # CRITICAL: Variables from top-level are stale - must recalculate here!
+                - variables:
+                    # Get fresh lux reading
+                    loop_current_lux: "{{ states(lux_sensor_entity) | float(0) }}"
+
+                    # Get fresh sun elevation
+                    loop_sun_elevation: "{{ state_attr('sun.sun', 'elevation') | float(0) }}"
+
+                    # Recalculate circadian color temperature
+                    loop_color_temp_kelvin: >
+                      {% if circadian_rhythm %}
+                        {% set elevation = state_attr('sun.sun', 'elevation') | float(0) %}
+                        {% if elevation < -6 %}
+                          1800
+                        {% elif elevation >= -6 and elevation < 0 %}
+                          {{ (1800 + (elevation + 6) * 200) | int }}
+                        {% elif elevation >= 0 and elevation < 10 %}
+                          {{ (3000 + (elevation * 50)) | int }}
+                        {% elif elevation >= 10 and elevation < 30 %}
+                          {{ (3500 + (elevation - 10) * 75) | int }}
+                        {% elif elevation >= 30 and elevation < 50 %}
+                          {{ (5000 + (elevation - 30) * 25) | int }}
+                        {% else %}
+                          5500
+                        {% endif %}
+                      {% else %}
+                        3000
+                      {% endif %}
+
+                    # Convert to mireds
+                    loop_color_temp_mireds: "{{ (1000000 / (loop_color_temp_kelvin | int)) | int }}"
+
+                    # Recalculate dynamic brightness based on current lux
+                    loop_calculated_brightness: >
+                      {% if dynamic_brightness %}
+                        {% set lux = states(lux_sensor_entity) | float(0) %}
+                        {% if lux <= 50 %}
+                          {{ brightness_at_50_lux }}
+                        {% elif lux <= 75 %}
+                          {% set range_pct = (lux - 50) / 25 %}
+                          {{ (brightness_at_50_lux - (brightness_at_50_lux - brightness_at_75_lux) * range_pct) | int }}
+                        {% elif lux <= 100 %}
+                          {% set range_pct = (lux - 75) / 25 %}
+                          {{ (brightness_at_75_lux - (brightness_at_75_lux - brightness_at_100_lux) * range_pct) | int }}
+                        {% elif lux <= 125 %}
+                          {% set range_pct = (lux - 100) / 25 %}
+                          {{ (brightness_at_100_lux - (brightness_at_100_lux - brightness_at_125_lux) * range_pct) | int }}
+                        {% elif lux <= 150 %}
+                          {% set range_pct = (lux - 125) / 25 %}
+                          {{ (brightness_at_125_lux - (brightness_at_125_lux - brightness_at_150_lux) * range_pct) | int }}
+                        {% else %}
+                          {{ brightness_at_150_lux }}
+                        {% endif %}
+                      {% else %}
+                        100
+                      {% endif %}
+
+                    # Recalculate override state
+                    loop_override_active: >
+                      {% if override_system_enabled and override_trigger_entity %}
+                        {{ is_state(override_trigger_entity, 'on') }}
+                      {% else %}
+                        false
+                      {% endif %}
+
+                    # Recalculate scene state
+                    loop_scene_is_active: >
+                      {% if scene_cycling_system_enabled and scene_tracker_entity %}
+                        {{ (states(scene_tracker_entity) | int(0)) > 0 }}
+                      {% else %}
+                        false
+                      {% endif %}
+
                 # Update lights with current circadian color and dynamic brightness
                 # But SKIP if scene is active (scene overrides circadian)
                 # Otherwise only update if lux is still low enough OR override is active
@@ -1140,30 +1335,30 @@ action:
                     # Scene active - skip circadian updates to preserve scene
                     - conditions:
                         - condition: template
-                          value_template: "{{ scene_is_active }}"
+                          value_template: "{{ loop_scene_is_active }}"
                       sequence:
                         - service: system_log.write
                           data:
-                            message: "Skipping circadian update - scene {{ current_scene_state }} is active"
+                            message: "Skipping circadian update - scene is active"
                             level: debug
 
                     # No scene active - normal circadian update
                     - conditions:
                         - condition: template
-                          value_template: "{{ override_active or (current_lux < lux_off_threshold) }}"
+                          value_template: "{{ loop_override_active or (loop_current_lux < lux_off_threshold) }}"
                       sequence:
                         - service: light.turn_on
                           target: !input target_lights
                           data:
-                            brightness_pct: "{{ calculated_brightness }}"
-                            color_temp: "{{ color_temp_mireds }}"
+                            brightness_pct: "{{ loop_calculated_brightness }}"
+                            color_temp: "{{ loop_color_temp_mireds }}"
                             transition: "{{ circadian_transition_sec }}"
 
                     # Lux exceeded OFF threshold - wait for debounce then turn off
                     # But SKIP if scene is active (scene ignores lux)
                     - conditions:
                         - condition: template
-                          value_template: "{{ not override_active and not scene_is_active and (current_lux >= lux_off_threshold) }}"
+                          value_template: "{{ not loop_override_active and not loop_scene_is_active and (loop_current_lux >= lux_off_threshold) }}"
                       sequence:
                         # Wait for lux to stay high for debounce period
                         - wait_template: "{{ states(lux_sensor_entity) | float >= lux_off_threshold }}"
@@ -1209,7 +1404,7 @@ action:
                 sequence:
                   # Stage 1: Wait, then dim to 40% + warm to 1800K
                   - delay:
-                      seconds: "{{ stage_1_delay_sec }}"
+                      seconds: "{{ effective_stage_1_delay }}"
 
                   - service: light.turn_on
                     target: !input target_lights
@@ -1220,7 +1415,7 @@ action:
 
                   # Stage 2: Wait, then dim to 20% (keep 1800K)
                   - delay:
-                      seconds: "{{ stage_2_delay_sec - stage_1_delay_sec }}"
+                      seconds: "{{ effective_stage_2_delay - effective_stage_1_delay }}"
 
                   - service: light.turn_on
                     target: !input target_lights
@@ -1231,7 +1426,7 @@ action:
 
                   # Stage 3: Wait, then turn off completely
                   - delay:
-                      seconds: "{{ stage_3_delay_sec - stage_2_delay_sec }}"
+                      seconds: "{{ effective_stage_3_delay - effective_stage_2_delay }}"
 
                   - service: light.turn_off
                     target: !input target_lights
@@ -1241,7 +1436,7 @@ action:
             default:
               # Staged turn-off disabled - simple turn-off after stage 3 delay
               - delay:
-                  seconds: "{{ stage_3_delay_sec }}"
+                  seconds: "{{ effective_stage_3_delay }}"
 
               - service: light.turn_off
                 target: !input target_lights
@@ -1251,30 +1446,92 @@ action:
       # ======================================================================
       # BRANCH 4: CIRCADIAN UPDATE CYCLE (BACKGROUND UPDATES)
       # ======================================================================
+      # NOTE: This branch handles time_pattern updates when lights are manually on
+      # without presence detection. The continuous presence loop in Branch 3 is the
+      # primary circadian update mechanism during normal occupancy.
       - conditions:
           - condition: trigger
             id: circadian_update
           - condition: template
             value_template: "{{ circadian_rhythm }}"
-          # Only update if lights are currently on
-          - condition: template
-            value_template: "{{ is_state_attr(target_lights.entity_id[0] if target_lights.entity_id is iterable else target_lights.entity_id, 'state', 'on') }}"
           # Skip if scene is active (scene overrides circadian)
           - condition: template
             value_template: "{{ not scene_is_active }}"
+          # Only proceed if presence is detected (this branch complements the loop)
+          - condition: state
+            entity_id: !input presence_sensor
+            state: "on"
         sequence:
+          # Recalculate current values (variables from top are stale)
+          - variables:
+              time_lux: "{{ states(lux_sensor_entity) | float(0) }}"
+              time_sun_elevation: "{{ state_attr('sun.sun', 'elevation') | float(0) }}"
+
+              time_color_kelvin: >
+                {% if circadian_rhythm %}
+                  {% set elevation = state_attr('sun.sun', 'elevation') | float(0) %}
+                  {% if elevation < -6 %}
+                    1800
+                  {% elif elevation >= -6 and elevation < 0 %}
+                    {{ (1800 + (elevation + 6) * 200) | int }}
+                  {% elif elevation >= 0 and elevation < 10 %}
+                    {{ (3000 + (elevation * 50)) | int }}
+                  {% elif elevation >= 10 and elevation < 30 %}
+                    {{ (3500 + (elevation - 10) * 75) | int }}
+                  {% elif elevation >= 30 and elevation < 50 %}
+                    {{ (5000 + (elevation - 30) * 25) | int }}
+                  {% else %}
+                    5500
+                  {% endif %}
+                {% else %}
+                  3000
+                {% endif %}
+
+              time_color_mireds: "{{ (1000000 / (time_color_kelvin | int)) | int }}"
+
+              time_brightness: >
+                {% if dynamic_brightness %}
+                  {% set lux = states(lux_sensor_entity) | float(0) %}
+                  {% if lux <= 50 %}
+                    {{ brightness_at_50_lux }}
+                  {% elif lux <= 75 %}
+                    {% set range_pct = (lux - 50) / 25 %}
+                    {{ (brightness_at_50_lux - (brightness_at_50_lux - brightness_at_75_lux) * range_pct) | int }}
+                  {% elif lux <= 100 %}
+                    {% set range_pct = (lux - 75) / 25 %}
+                    {{ (brightness_at_75_lux - (brightness_at_75_lux - brightness_at_100_lux) * range_pct) | int }}
+                  {% elif lux <= 125 %}
+                    {% set range_pct = (lux - 100) / 25 %}
+                    {{ (brightness_at_100_lux - (brightness_at_100_lux - brightness_at_125_lux) * range_pct) | int }}
+                  {% elif lux <= 150 %}
+                    {% set range_pct = (lux - 125) / 25 %}
+                    {{ (brightness_at_125_lux - (brightness_at_125_lux - brightness_at_150_lux) * range_pct) | int }}
+                  {% else %}
+                    {{ brightness_at_150_lux }}
+                  {% endif %}
+                {% else %}
+                  100
+                {% endif %}
+
+              time_override: >
+                {% if override_system_enabled and override_trigger_entity %}
+                  {{ is_state(override_trigger_entity, 'on') }}
+                {% else %}
+                  false
+                {% endif %}
+
           # Update color temperature based on current sun position
           # Only if lux allows OR override is active
           - choose:
               - conditions:
                   - condition: template
-                    value_template: "{{ override_active or (current_lux < lux_off_threshold) }}"
+                    value_template: "{{ time_override or (time_lux < lux_off_threshold) }}"
                 sequence:
                   - service: light.turn_on
                     target: !input target_lights
                     data:
-                      brightness_pct: "{{ calculated_brightness }}"
-                      color_temp: "{{ color_temp_mireds }}"
+                      brightness_pct: "{{ time_brightness }}"
+                      color_temp: "{{ time_color_mireds }}"
                       transition: "{{ circadian_transition_sec }}"
 
     # === DEFAULT BRANCH (FALLBACK) ===
