@@ -32,8 +32,8 @@ https://raw.githubusercontent.com/leviemartin/HomeAssistant-Repo/main/blueprints
 
 [📖 Quick Start](blueprints/INTELLIGENT_LIVING_ROOM_QUICK_START.md) | [📘 Complete Setup Guide](blueprints/INTELLIGENT_LIVING_ROOM_SETUP_GUIDE.md) | [🔬 Anti-Flicker Technical Guide](blueprints/ANTI_FLICKER_TECHNICAL_GUIDE.md) | [📡 FP2 Features Reference](blueprints/FP2_FEATURES_REFERENCE.md)
 
-### 4. Adjacent Zone Motion Sensor with Circadian Lighting ⭐ NEW v1.1
-Motion-activated lighting for hallways, bathrooms, and stairs with GUARANTEED color consistency to the living room blueprint. Uses identical circadian formulas (1800K-5500K) but with shorter turn-off intervals perfect for quick-transition spaces. Features zone presets (Very Quick/Quick/Medium), anti-flicker protection, and **NEW: Configurable Brightness Controls** (adjust brightness curve and stage dimming percentages).
+### 4. Adjacent Zone Motion Sensor with Circadian Lighting ⭐ v1.2
+Motion-activated lighting for hallways, bathrooms, and stairs with GUARANTEED color consistency to the living room blueprint. Uses identical circadian formulas (1800K-5500K) but with shorter turn-off intervals perfect for quick-transition spaces. Features zone presets (Very Quick/Quick/Medium), anti-flicker protection, and configurable brightness controls. **CRITICAL FIXES v1.2:** Lights now properly turn off after motion clears (v1.1 had stale variable bugs causing lights to stay on forever).
 
 **Import URL:**
 ```
@@ -298,7 +298,7 @@ Result: No flicker, smooth operation, natural feel.
 
 ---
 
-## Adjacent Zone Motion Sensor with Circadian Lighting ⭐ NEW v1.1
+## Adjacent Zone Motion Sensor with Circadian Lighting ⭐ v1.2
 
 ### Key Features
 
@@ -317,7 +317,7 @@ Result: No flicker, smooth operation, natural feel.
   - Hysteresis: 150 lux OFF / 80 lux ON (50 lux dead band)
   - Debouncing: 5 min before OFF, 2 min before ON
   - Extended sunrise/sunset debounce (10 minutes)
-- **Configurable Brightness Controls (NEW v1.1)**:
+- **Configurable Brightness Controls**:
   - Dynamic brightness enable/disable toggle
   - Adjustable brightness curve at 5 lux breakpoints (50/75/100/125/150 lux)
   - Customizable stage warning brightness (defaults: 40%/20%)
@@ -327,7 +327,14 @@ Result: No flicker, smooth operation, natural feel.
   - Stage 2: Configurable brightness (default 20%) + warm to 1800K
   - Stage 3: Turn off with 3-second fade
 - **Manual Override** - Toggle via button/switch/input_boolean to keep lights on
+- **CRITICAL FIXES (v1.2)** ⚠️:
+  - ✅ Lights now properly turn off after motion clears
+  - ✅ Turn-off intervals (5/10/15 min) now work correctly
+  - ✅ Fixed stale variable bug preventing lux-based turn-off
+  - ✅ Fixed blocking condition preventing staged warnings
+  - ✅ v1.1 bug: Lights stayed on forever, v1.2: Turn-off works properly
 - **Philips Hue Compatible** - Color_temp mode (mireds)
+- **Motion Sensor Compatible** - Works with Aqara PIR, Philips Hue PIR, and mmWave sensors
 
 ### Design Philosophy
 
@@ -386,6 +393,19 @@ override_entity: input_boolean.hallway_override
 | **Powder Room** | Medium | 10/15/20 min | Longer visits |
 | **Utility Room** | Medium | 10/15/20 min | Laundry tasks |
 | **Garage** | Medium | 10/15/20 min | Unloading car |
+
+### Recent Enhancements (v1.2) ⭐ CRITICAL UPDATE
+
+- ✅ **CRITICAL FIX: Turn-Off Functionality** - Lights now properly turn off after motion clears
+- ✅ **CRITICAL FIX: Stale Variables** - Fresh lux/brightness/color recalculated every 60 seconds
+- ✅ **CRITICAL FIX: Blocking Condition** - Removed condition that prevented staged turn-off sequence
+- ✅ **Bug Fix: Turn-Off Intervals** - Quick/Medium/Very Quick presets now work correctly
+- ✅ **v1.1 Issue**: Lights stayed on all day regardless of motion state → **v1.2 Fix**: Proper turn-off
+
+### Previous Enhancements (v1.1)
+
+- ✅ **Configurable Brightness Controls** - Adjustable brightness curve at 5 lux breakpoints
+- ✅ **Stage Brightness Controls** - Customizable dimming percentages (40%/20%)
 
 ---
 
