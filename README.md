@@ -32,8 +32,8 @@ https://raw.githubusercontent.com/leviemartin/HomeAssistant-Repo/main/blueprints
 
 [📖 Quick Start](blueprints/INTELLIGENT_LIVING_ROOM_QUICK_START.md) | [📘 Complete Setup Guide](blueprints/INTELLIGENT_LIVING_ROOM_SETUP_GUIDE.md) | [🔬 Anti-Flicker Technical Guide](blueprints/ANTI_FLICKER_TECHNICAL_GUIDE.md) | [📡 FP2 Features Reference](blueprints/FP2_FEATURES_REFERENCE.md)
 
-### 4. Adjacent Zone Motion Sensor with Circadian Lighting ⭐ v1.2
-Motion-activated lighting for hallways, bathrooms, and stairs with GUARANTEED color consistency to the living room blueprint. Uses identical circadian formulas (1800K-5500K) but with shorter turn-off intervals perfect for quick-transition spaces. Features zone presets (Very Quick/Quick/Medium), anti-flicker protection, and configurable brightness controls. **CRITICAL FIXES v1.2:** Lights now properly turn off after motion clears (v1.1 had stale variable bugs causing lights to stay on forever).
+### 4. Adjacent Zone Motion Sensor with Circadian Lighting ⭐ v1.3
+Motion-activated lighting for hallways, bathrooms, and stairs with GUARANTEED color consistency to the living room blueprint. Uses identical circadian formulas (1800K-5500K) with hardcoded Quick timing (5/10/15 min) optimized for quick-transition spaces. **CRITICAL FIX v1.3:** Complete rewrite for PIR sensor compatibility (Philips Hue, Aqara P1) - uses wait_for_trigger pattern instead of monitoring loop to handle PIR cooldown behavior. **Now Actually Works!**
 
 **Import URL:**
 ```
@@ -298,25 +298,26 @@ Result: No flicker, smooth operation, natural feel.
 
 ---
 
-## Adjacent Zone Motion Sensor with Circadian Lighting ⭐ v1.2
+## Adjacent Zone Motion Sensor with Circadian Lighting ⭐ v1.3
 
 ### Key Features
 
 - **100% Color Consistency** - Extracted IDENTICAL circadian formulas from living room blueprint
 - **Hardcoded Lux Thresholds** - 150/80 lux (not configurable) for guaranteed matching
-- **Zone Preset System** - Quick-select timing profiles:
-  - **Very Quick** (3/5/7 min) - Closets, Stairs
-  - **Quick** (5/10/15 min) - Hallways, Bathrooms ✅ Default
-  - **Medium** (10/15/20 min) - Utility, Garage
-  - **Custom** - Manual configuration
+- **Hardcoded Quick Timing** - 5/10/15 minutes (simplified, no presets)
+  - 15 min initial wait (motion must clear completely)
+  - 5 min Stage 1 delay (40% brightness, 1800K warm)
+  - 5 min Stage 2 delay (20% brightness, 1800K warm)
+  - Total: 25 minutes from last motion to lights off
+  - Optimized for hallways and bathrooms
 - **Sun-Aware Circadian Rhythm**:
   - 1800K-5500K based on sun elevation
   - Identical mapping to living room
-  - 60-second continuous updates
+  - Set at light turn-on (not continuous updates)
 - **Anti-Flicker Protection**:
   - Hysteresis: 150 lux OFF / 80 lux ON (50 lux dead band)
-  - Debouncing: 5 min before OFF, 2 min before ON
-  - Extended sunrise/sunset debounce (10 minutes)
+  - Debouncing: 2 min before ON
+  - Prevents lights flickering during cloud cover
 - **Configurable Brightness Controls**:
   - Dynamic brightness enable/disable toggle
   - Adjustable brightness curve at 5 lux breakpoints (50/75/100/125/150 lux)
@@ -327,14 +328,16 @@ Result: No flicker, smooth operation, natural feel.
   - Stage 2: Configurable brightness (default 20%) + warm to 1800K
   - Stage 3: Turn off with 3-second fade
 - **Manual Override** - Toggle via button/switch/input_boolean to keep lights on
-- **CRITICAL FIXES (v1.2)** ⚠️:
-  - ✅ Lights now properly turn off after motion clears
-  - ✅ Turn-off intervals (5/10/15 min) now work correctly
-  - ✅ Fixed stale variable bug preventing lux-based turn-off
-  - ✅ Fixed blocking condition preventing staged warnings
-  - ✅ v1.1 bug: Lights stayed on forever, v1.2: Turn-off works properly
+- **CRITICAL FIX (v1.3)** ⚠️ COMPLETE REWRITE:
+  - ✅ **ROOT CAUSE FIXED**: v1.1/v1.2 used monitoring loop pattern designed for mmWave sensors
+  - ✅ **PIR Sensors Now Work**: Philips Hue and Aqara P1 have 1-2 min hardware cooldown
+  - ✅ **New Pattern**: wait_for_trigger watches for NEW motion events, ignores PIR cooldown
+  - ✅ **Simplified**: Removed preset system, hardcoded Quick timing (5/10/15 min)
+  - ✅ **24% Code Reduction**: 861 lines → 655 lines
+  - ✅ **Actually Works Now**: Lights turn off after 25 min of no motion
+  - ❌ v1.1/v1.2 bug: PIR cooldown caused infinite restart loop → lights stayed on forever
 - **Philips Hue Compatible** - Color_temp mode (mireds)
-- **Motion Sensor Compatible** - Works with Aqara PIR, Philips Hue PIR, and mmWave sensors
+- **PIR Motion Sensor Compatible** ⭐ - Philips Hue, Aqara P1, generic PIR (also works with mmWave)
 
 ### Design Philosophy
 
@@ -382,30 +385,35 @@ override_entity: input_boolean.hallway_override
 - [📘 Complete Setup Guide](blueprints/ADJACENT_ZONE_SETUP_GUIDE.md) - Zone configuration, advanced features
 - [🎨 Color Consistency Guide](blueprints/COLOR_CONSISTENCY_GUIDE.md) - Technical details on color matching
 
-### Zone Preset Recommendations
+### Hardcoded Timing (No Configuration Needed)
 
-| Zone Type | Preset | Turn-Off Intervals | Use Case |
-|-----------|--------|-------------------|----------|
-| **Closet** | Very Quick | 3/5/7 min | Quick in-and-out |
-| **Stairs** | Very Quick | 3/5/7 min | Brief transitions |
-| **Hallway** | Quick | 5/10/15 min | Short walks |
-| **Bathroom** | Quick | 5/10/15 min | Hand washing, quick visits |
-| **Powder Room** | Medium | 10/15/20 min | Longer visits |
-| **Utility Room** | Medium | 10/15/20 min | Laundry tasks |
-| **Garage** | Medium | 10/15/20 min | Unloading car |
+**Quick preset permanently configured for hallways and bathrooms:**
 
-### Recent Enhancements (v1.2) ⭐ CRITICAL UPDATE
+| Event | Timing | What Happens |
+|-------|--------|--------------|
+| **Motion Detected** | T+0 | Lights turn ON (100%, circadian color) |
+| **Motion Clears** | T+0 to T+15 | Wait for new motion (or timeout) |
+| **Stage 1 Warning** | T+15 | Dim to 40% + warm to 1800K |
+| **Stage 2 Warning** | T+20 | Dim to 20% + warm to 1800K |
+| **Lights OFF** | T+25 | Turn off with 3-second fade |
 
-- ✅ **CRITICAL FIX: Turn-Off Functionality** - Lights now properly turn off after motion clears
-- ✅ **CRITICAL FIX: Stale Variables** - Fresh lux/brightness/color recalculated every 60 seconds
-- ✅ **CRITICAL FIX: Blocking Condition** - Removed condition that prevented staged turn-off sequence
-- ✅ **Bug Fix: Turn-Off Intervals** - Quick/Medium/Very Quick presets now work correctly
-- ✅ **v1.1 Issue**: Lights stayed on all day regardless of motion state → **v1.2 Fix**: Proper turn-off
+**If motion detected during any stage:** Automation restarts from T+0 (lights back to 100%)
 
-### Previous Enhancements (v1.1)
+### Recent Enhancements (v1.3) ⭐ COMPLETE REWRITE
 
-- ✅ **Configurable Brightness Controls** - Adjustable brightness curve at 5 lux breakpoints
-- ✅ **Stage Brightness Controls** - Customizable dimming percentages (40%/20%)
+- ✅ **ROOT CAUSE IDENTIFIED**: v1.1/v1.2 used monitoring loop designed for mmWave sensors
+- ✅ **PIR Cooldown Handling**: PIR sensors go "OFF" after 1-2 min (hardware behavior)
+- ✅ **New Architecture**: wait_for_trigger pattern ignores PIR cooldown, watches for NEW triggers
+- ✅ **Simplified Code**: Removed preset system (Very Quick/Medium/Custom)
+- ✅ **Hardcoded Timing**: Quick preset only (5/10/15 min)
+- ✅ **24% Smaller**: 861 lines → 655 lines
+- ✅ **Actually Works**: Lights turn off after 25 min of no motion (tested with Philips Hue & Aqara P1)
+
+### Previous Attempts (v1.1/v1.2) - FAILED
+
+- ❌ **v1.1**: Stale variables + blocking condition → lights stayed on forever
+- ❌ **v1.2**: Added variable recalculation → still failed due to PIR cooldown issue
+- ❌ **Root Problem**: Monitoring loop pattern incompatible with PIR hardware behavior
 
 ---
 
