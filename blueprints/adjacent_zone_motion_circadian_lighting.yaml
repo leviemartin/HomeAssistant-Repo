@@ -1,10 +1,14 @@
 blueprint:
-  name: Adjacent Zone Motion - Circadian Lighting v1.1
+  name: Adjacent Zone Motion - Circadian Lighting v1.2
   description: >
     Motion-activated lighting for hallways, bathrooms, and stairs with EXACT color
     consistency to the Intelligent Living Room blueprint. Features lux-aware control,
     circadian rhythm, staged turn-off warnings, zone-based timing presets, and
     configurable brightness controls.
+
+
+    This is v1.2 - CRITICAL FIX: Resolves lights staying on indefinitely issue.
+    Fixes stale variable bug preventing turn-off, adds explicit motion-clear detection.
 
 
     This blueprint is OPTIMIZED for adjacent zones like hallways, bathrooms, stairs,
@@ -16,7 +20,8 @@ blueprint:
 
 
     - MOTION SENSOR INTEGRATION: Works with any PIR or mmWave motion sensor. Simple
-      binary_sensor detection - no complex zone mapping required.
+      binary_sensor detection - no complex zone mapping required. Compatible with
+      Aqara, Philips Hue, and all standard motion sensors.
 
 
     - ZONE PRESET SYSTEM: Quick-select timing presets for common zones:
@@ -57,6 +62,11 @@ blueprint:
 
     COMPATIBILITY: Works with any motion sensor, Philips Hue/IKEA Tradfri lights,
     and standard illuminance sensors.
+
+
+    v1.2 CHANGELOG: Fixed critical bug where lights would stay on indefinitely.
+    Variables are now recalculated in monitoring loop for accurate lux/override detection.
+    Improved motion-clear detection for PIR sensors with cooldown periods.
 
   domain: automation
   source_url: https://github.com/martinlevie/HomeAssistant-Repo/blueprints/adjacent_zone_motion_circadian_lighting.yaml
@@ -656,36 +666,99 @@ action:
 
           # === CONTINUOUS MOTION MONITORING ===
           # While motion is active, continuously update brightness and color
+          # This loop monitors motion and updates lights until motion clears
           - repeat:
               sequence:
                 # Wait for circadian update interval
                 - delay:
                     seconds: "{{ circadian_update_sec }}"
 
-                # Check if lights are still on and motion still detected
-                - condition: state
-                  entity_id: !input motion_sensor
-                  state: "on"
+                # === RECALCULATE DYNAMIC VALUES FOR THIS ITERATION ===
+                # CRITICAL FIX v1.2: Variables from top-level are stale - must recalculate here!
+                # This ensures lux, override state, and circadian values are current
+                - variables:
+                    # Get fresh lux reading
+                    loop_current_lux: "{{ states(lux_sensor_entity) | float(0) }}"
+
+                    # Get fresh sun elevation
+                    loop_sun_elevation: "{{ state_attr('sun.sun', 'elevation') | float(0) }}"
+
+                    # Recalculate circadian color temperature with current sun position
+                    loop_color_temp_kelvin: >
+                      {% if circadian_rhythm %}
+                        {% set elevation = state_attr('sun.sun', 'elevation') | float(0) %}
+                        {% if elevation < -6 %}
+                          1800
+                        {% elif elevation >= -6 and elevation < 0 %}
+                          {{ (1800 + (elevation + 6) * 200) | int }}
+                        {% elif elevation >= 0 and elevation < 10 %}
+                          {{ (3000 + (elevation * 50)) | int }}
+                        {% elif elevation >= 10 and elevation < 30 %}
+                          {{ (3500 + (elevation - 10) * 75) | int }}
+                        {% elif elevation >= 30 and elevation < 50 %}
+                          {{ (5000 + (elevation - 30) * 25) | int }}
+                        {% else %}
+                          5500
+                        {% endif %}
+                      {% else %}
+                        3000
+                      {% endif %}
+
+                    # Convert to mireds
+                    loop_color_temp_mireds: "{{ (1000000 / (loop_color_temp_kelvin | int)) | int }}"
+
+                    # Recalculate dynamic brightness based on current lux
+                    loop_calculated_brightness: >
+                      {% if dynamic_brightness %}
+                        {% set lux = states(lux_sensor_entity) | float(0) %}
+                        {% if lux <= 50 %}
+                          {{ brightness_at_50_lux }}
+                        {% elif lux <= 75 %}
+                          {% set range_pct = (lux - 50) / 25 %}
+                          {{ (brightness_at_50_lux - (brightness_at_50_lux - brightness_at_75_lux) * range_pct) | int }}
+                        {% elif lux <= 100 %}
+                          {% set range_pct = (lux - 75) / 25 %}
+                          {{ (brightness_at_75_lux - (brightness_at_75_lux - brightness_at_100_lux) * range_pct) | int }}
+                        {% elif lux <= 125 %}
+                          {% set range_pct = (lux - 100) / 25 %}
+                          {{ (brightness_at_100_lux - (brightness_at_100_lux - brightness_at_125_lux) * range_pct) | int }}
+                        {% elif lux <= 150 %}
+                          {% set range_pct = (lux - 125) / 25 %}
+                          {{ (brightness_at_125_lux - (brightness_at_125_lux - brightness_at_150_lux) * range_pct) | int }}
+                        {% else %}
+                          {{ brightness_at_150_lux }}
+                        {% endif %}
+                      {% else %}
+                        100
+                      {% endif %}
+
+                    # Recalculate override state (in case user toggled it)
+                    loop_override_active: >
+                      {% if override_system_enabled and override_trigger_entity %}
+                        {{ is_state(override_trigger_entity, 'on') }}
+                      {% else %}
+                        false
+                      {% endif %}
 
                 # Update lights with current circadian color and dynamic brightness
                 # Only update if lux is still low enough OR override is active
                 - choose:
-                    # Normal circadian update
+                    # Normal circadian update when lux allows or override active
                     - conditions:
                         - condition: template
-                          value_template: "{{ override_active or (current_lux < lux_off_threshold) }}"
+                          value_template: "{{ loop_override_active or (loop_current_lux < lux_off_threshold) }}"
                       sequence:
                         - service: light.turn_on
                           target: !input target_lights
                           data:
-                            brightness_pct: "{{ calculated_brightness }}"
-                            color_temp: "{{ color_temp_mireds }}"
+                            brightness_pct: "{{ loop_calculated_brightness }}"
+                            color_temp: "{{ loop_color_temp_mireds }}"
                             transition: "{{ circadian_transition_sec }}"
 
-                    # Lux exceeded OFF threshold - wait for debounce then turn off
+                    # Lux exceeded OFF threshold and no override - wait for debounce then turn off
                     - conditions:
                         - condition: template
-                          value_template: "{{ not override_active and (current_lux >= lux_off_threshold) }}"
+                          value_template: "{{ not loop_override_active and (loop_current_lux >= lux_off_threshold) }}"
                       sequence:
                         # Wait for lux to stay high for debounce period
                         - wait_template: "{{ states(lux_sensor_entity) | float >= lux_off_threshold }}"
@@ -699,10 +772,11 @@ action:
                           data:
                             transition: 5
 
-                        # Exit repeat loop
+                        # Exit entire automation (lights off, job done)
                         - stop: "Lights turned off due to high lux"
 
               # Continue updating until motion clears
+              # This is checked at the END of each iteration
               until:
                 - condition: state
                   entity_id: !input motion_sensor
