@@ -1,20 +1,20 @@
 blueprint:
-  name: Intelligent Living Room - mmWave + Lux-Aware v1.2
+  name: Intelligent Living Room - mmWave + Lux-Aware v1.3
   description: >
     Professional-grade lighting automation combining mmWave presence detection,
     lux-aware hysteresis anti-flicker logic, staged turn-off sequences, dynamic
     brightness adjustment, sun-aware circadian rhythm, and Philips Hue scene cycling.
 
 
-    This is v1.2 - fixes circadian/brightness updates during occupancy + adds night mode fast shutdown.
+    This is v1.3 - simplified turn-on logic (no debounce wait) + optimized turn-off timing.
 
 
     KEY FEATURES:
 
 
     - ANTI-FLICKER HYSTERESIS: Dual-threshold system with separate ON/OFF lux levels
-      prevents light flicker. Turn OFF at 150 lux (5 min debounce), turn ON at 80 lux
-      (2 min debounce). Extended 10 min debounce during sunrise/sunset transitions.
+      prevents light flicker. Turn OFF at 150 lux, turn ON at 80 lux. 50 lux dead band
+      provides reliable protection against flickering from clouds and natural light changes.
 
 
     - MMWAVE PRESENCE: Single sensor design (Aqara FP2, EP1, or similar). Approach
@@ -29,8 +29,9 @@ blueprint:
       sun elevation for authentic natural lighting. Philips Hue native color_temp/mireds mode.
 
 
-    - STAGED TURN-OFF: Gradual dimming sequence before lights turn off. Stage 1 (30 min):
-      40% + 1800K warm, Stage 2 (40 min): 20% + 1800K warm, Stage 3 (45 min): OFF.
+    - STAGED TURN-OFF: Gradual dimming sequence before lights turn off. Day mode (15/20/25 min):
+      Stage 1 @ 15 min (40% + 1800K), Stage 2 @ 20 min (20% + 1800K), Stage 3 @ 25 min (OFF).
+      Night mode (5/10/15 min): Faster response after 10pm for bedtime routines.
 
 
     - MANUAL OVERRIDE: Button/switch/input_boolean support. Toggle behavior to keep
@@ -42,8 +43,6 @@ blueprint:
       return to normal automation. Scenes override lux-based control and circadian lighting.
 
 
-    - SUNRISE/SUNSET SMART: 10-minute extended debounce during dawn/dusk prevents
-      oscillation from rapidly changing ambient light.
 
 
     PERFECT FOR: Living rooms, family rooms, media rooms with large windows prone to
@@ -129,7 +128,7 @@ blueprint:
     lux_turn_off_threshold:
       name: Lux Turn-OFF Threshold
       description: >
-        Lights will turn OFF when lux rises ABOVE this value (after debounce). Default: 150 lux.
+        Lights will turn OFF when lux rises ABOVE this value. Default: 150 lux.
         This is the UPPER threshold of the hysteresis band. Must be higher than turn-ON
         threshold to create hysteresis gap (prevents flickering). Higher values = lights
         stay on even when fairly bright.
@@ -140,51 +139,6 @@ blueprint:
           max: 500
           step: 10
           unit_of_measurement: lux
-          mode: slider
-
-    lux_turn_on_debounce:
-      name: Turn-ON Debounce Duration
-      description: >
-        Wait this long after lux drops below ON threshold before allowing lights to turn on.
-        Prevents rapid on/off from passing clouds. Default: 2 minutes. Increase if you have
-        flickering issues on cloudy days.
-      default: 120
-      selector:
-        number:
-          min: 30
-          max: 600
-          step: 30
-          unit_of_measurement: seconds
-          mode: slider
-
-    lux_turn_off_debounce:
-      name: Turn-OFF Debounce Duration
-      description: >
-        Wait this long after lux rises above OFF threshold before turning lights off.
-        Prevents rapid on/off from passing clouds. Default: 5 minutes (300 seconds).
-        Longer debounce = more stable but less responsive to actual brightness changes.
-      default: 300
-      selector:
-        number:
-          min: 60
-          max: 900
-          step: 30
-          unit_of_measurement: seconds
-          mode: slider
-
-    sunrise_sunset_extended_debounce:
-      name: Sunrise/Sunset Extended Debounce
-      description: >
-        During dawn/dusk transitions (1 hour before/after sunrise/sunset), use this EXTENDED
-        debounce for turn-off to prevent oscillation during slow natural light changes.
-        Default: 10 minutes. Only affects turn-OFF, not turn-ON.
-      default: 600
-      selector:
-        number:
-          min: 300
-          max: 1200
-          step: 60
-          unit_of_measurement: seconds
           mode: slider
 
     # ============================================================================
@@ -490,9 +444,9 @@ blueprint:
     stage_1_delay:
       name: Stage 1 Delay (First Warning)
       description: >
-        Time of no presence before first warning (dim + warm color). Default: 30 minutes.
+        Time of no presence before first warning (dim + warm color). Default: 15 minutes.
         Lights dim to Stage 1 brightness and shift to 1800K warm warning color.
-      default: 1800
+      default: 900
       selector:
         number:
           min: 300
@@ -518,9 +472,9 @@ blueprint:
     stage_2_delay:
       name: Stage 2 Delay (Second Warning)
       description: >
-        Time of no presence before second warning (dimmer). Default: 40 minutes. Lights
+        Time of no presence before second warning (dimmer). Default: 20 minutes. Lights
         dim further to Stage 2 brightness, still at 1800K warm.
-      default: 2400
+      default: 1200
       selector:
         number:
           min: 600
@@ -546,9 +500,9 @@ blueprint:
     stage_3_delay:
       name: Stage 3 Delay (Complete Turn-Off)
       description: >
-        Time of no presence before complete turn-off. Default: 45 minutes (2700 seconds).
+        Time of no presence before complete turn-off. Default: 25 minutes (1500 seconds).
         Lights turn off completely with 3-second fade.
-      default: 2700
+      default: 1500
       selector:
         number:
           min: 900
@@ -606,8 +560,8 @@ blueprint:
     night_stage_2_delay:
       name: Night Mode Stage 2 Delay
       description: >
-        Stage 2 delay during night mode (second warning). Default: 7 minutes (420 seconds).
-      default: 420
+        Stage 2 delay during night mode (second warning). Default: 10 minutes (600 seconds).
+      default: 600
       selector:
         number:
           min: 120
@@ -619,9 +573,9 @@ blueprint:
     night_stage_3_delay:
       name: Night Mode Stage 3 Delay
       description: >
-        Stage 3 delay during night mode (complete turn-off). Default: 10 minutes (600 seconds).
+        Stage 3 delay during night mode (complete turn-off). Default: 15 minutes (900 seconds).
         Lights turn off completely after this duration with no presence.
-      default: 600
+      default: 900
       selector:
         number:
           min: 180
@@ -665,12 +619,9 @@ variables:
   # Scene behavior
   scene_bypass_timeout: !input scene_bypass_presence_timeout
 
-  # === LUX THRESHOLDS AND DEBOUNCE ===
+  # === LUX THRESHOLDS ===
   lux_on_threshold: !input lux_turn_on_threshold
   lux_off_threshold: !input lux_turn_off_threshold
-  lux_on_debounce_sec: !input lux_turn_on_debounce
-  lux_off_debounce_sec: !input lux_turn_off_debounce
-  sunrise_sunset_debounce_sec: !input sunrise_sunset_extended_debounce
 
   # === FEATURE FLAGS ===
   override_system_enabled: !input override_enabled
@@ -749,35 +700,6 @@ variables:
 
   # === SUN POSITION DATA ===
   sun_elevation: "{{ state_attr('sun.sun', 'elevation') | float(0) }}"
-
-  # Calculate sunrise/sunset times for today
-  sunrise_timestamp: "{{ as_timestamp(state_attr('sun.sun', 'next_rising')) | int }}"
-  sunset_timestamp: "{{ as_timestamp(state_attr('sun.sun', 'next_setting')) | int }}"
-  current_timestamp: "{{ now().timestamp() | int }}"
-
-  # === SUNRISE/SUNSET DETECTION (1 hour window before/after) ===
-  # Check if we're within 1 hour before/after sunrise
-  is_near_sunrise: >
-    {{ (current_timestamp >= (sunrise_timestamp - 3600) and
-        current_timestamp <= (sunrise_timestamp + 3600)) }}
-
-  # Check if we're within 1 hour before/after sunset
-  is_near_sunset: >
-    {{ (current_timestamp >= (sunset_timestamp - 3600) and
-        current_timestamp <= (sunset_timestamp + 3600)) }}
-
-  # Combined dawn/dusk detection
-  is_dawn_or_dusk: >
-    {{ is_near_sunrise or is_near_sunset }}
-
-  # === SMART DEBOUNCE SELECTION ===
-  # Use extended debounce during sunrise/sunset, normal debounce otherwise
-  effective_off_debounce: >
-    {% if is_dawn_or_dusk %}
-      {{ sunrise_sunset_debounce_sec }}
-    {% else %}
-      {{ lux_off_debounce_sec }}
-    {% endif %}
 
   # === OVERRIDE SYSTEM STATE ===
   # Check if override is currently active (using input_boolean, binary_sensor, or switch state)
@@ -1194,7 +1116,7 @@ action:
           # === LUX HYSTERESIS CHECK (ANTI-FLICKER LOGIC) ===
           # Only turn on if:
           # 1. Override is active (ignore lux), OR
-          # 2. Lux is below ON threshold (after debounce)
+          # 2. Lux is below ON threshold
 
           - choose:
               # Scene active - preserve scene, don't override with circadian
@@ -1225,13 +1147,7 @@ action:
                   - condition: template
                     value_template: "{{ current_lux < lux_on_threshold }}"
                 sequence:
-                  # Lux is below ON threshold - wait for debounce before turning on
-                  - wait_template: "{{ states(lux_sensor_entity) | float < lux_on_threshold }}"
-                    timeout:
-                      seconds: "{{ lux_on_debounce_sec }}"
-                    continue_on_timeout: false
-
-                  # Debounce passed - turn on lights
+                  # Lux is below ON threshold - turn on lights immediately
                   - service: light.turn_on
                     target: !input target_lights
                     data:
@@ -1354,19 +1270,14 @@ action:
                             color_temp: "{{ loop_color_temp_mireds }}"
                             transition: "{{ circadian_transition_sec }}"
 
-                    # Lux exceeded OFF threshold - wait for debounce then turn off
+                    # Lux exceeded OFF threshold - turn off immediately
                     # But SKIP if scene is active (scene ignores lux)
                     - conditions:
                         - condition: template
                           value_template: "{{ not loop_override_active and not loop_scene_is_active and (loop_current_lux >= lux_off_threshold) }}"
                       sequence:
-                        # Wait for lux to stay high for debounce period
-                        - wait_template: "{{ states(lux_sensor_entity) | float >= lux_off_threshold }}"
-                          timeout:
-                            seconds: "{{ effective_off_debounce }}"
-                          continue_on_timeout: false
-
-                        # Debounce passed - turn off lights (lux too high)
+                        # Lux is above OFF threshold - turn off lights immediately
+                        # Hysteresis (80/150 thresholds) already provides anti-flicker protection
                         - service: light.turn_off
                           target: !input target_lights
                           data:
