@@ -22,8 +22,8 @@ https://raw.githubusercontent.com/leviemartin/HomeAssistant-Repo/main/blueprints
 
 [📖 Quick Start Guide](blueprints/QUICK_START.md) | [🔬 Scientific Details](blueprints/SUN_AWARE_UPGRADE_GUIDE.md) | [⚖️ Feature Comparison](blueprints/FEATURE_COMPARISON.md)
 
-### 3. Intelligent Living Room Lighting (mmWave + Lux Aware) ⭐ v1.3
-Advanced living room automation with Aqara FP2 mmWave presence detection, natural light awareness, and anti-flicker protection. Features sun-aware circadian rhythm integration, dynamic brightness scaling, optimized turn-off timing (day: 15/20/25 min, night: 5/10/15 min), scene cycling (cycle through 3 Philips Hue scenes). **NEW v1.3:** Simplified turn-on logic (no debounce wait) for immediate response. **Turns on/off instantly when lux thresholds crossed!**
+### 3. Intelligent Living Room Lighting (mmWave + Lux Aware) ⭐ v1.4
+Advanced living room automation with Aqara FP2 mmWave presence detection, natural light awareness, and anti-flicker protection. Features sun-aware circadian rhythm integration, dynamic brightness scaling, optimized turn-off timing (day: 15/20/25 min, night: 5/10/15 min), scene cycling (cycle through 3 Philips Hue scenes). **CRITICAL FIX v1.4:** Adds lux numeric_state trigger so lights turn off immediately when room becomes bright! **No more lights staying on during sunny days!**
 
 **Import URL:**
 ```
@@ -32,8 +32,8 @@ https://raw.githubusercontent.com/leviemartin/HomeAssistant-Repo/main/blueprints
 
 [📖 Quick Start](blueprints/INTELLIGENT_LIVING_ROOM_QUICK_START.md) | [📘 Complete Setup Guide](blueprints/INTELLIGENT_LIVING_ROOM_SETUP_GUIDE.md) | [🔬 Anti-Flicker Technical Guide](blueprints/ANTI_FLICKER_TECHNICAL_GUIDE.md) | [📡 FP2 Features Reference](blueprints/FP2_FEATURES_REFERENCE.md)
 
-### 4. Adjacent Zone Motion Sensor with Circadian Lighting ⭐ v1.4
-Motion-activated lighting for hallways, bathrooms, and stairs with GUARANTEED color consistency to the living room blueprint. Uses identical circadian formulas (1800K-5500K) with hardcoded Quick timing (5/10/15 min = 15 min total) optimized for quick-transition spaces. **CRITICAL FIX v1.4:** Removes debounce wait that prevented lights from turning on when lux fluctuated. **Now turns on immediately AND turns off reliably!**
+### 4. Adjacent Zone Motion Sensor with Circadian Lighting ⭐ v1.5
+Motion-activated lighting for hallways, bathrooms, and stairs with GUARANTEED color consistency to the living room blueprint. Uses identical circadian formulas (1800K-5500K) with hardcoded Quick timing (5/10/15 min = 15 min total) optimized for quick-transition spaces. **CRITICAL FIX v1.5:** Adds lux numeric_state trigger so lights turn off when room becomes bright! **Finally works reliably in sunny conditions!**
 
 **Import URL:**
 ```
@@ -205,7 +205,7 @@ evening_latest: "20:30:00"
 
 ---
 
-## Intelligent Living Room Lighting ⭐ v1.3
+## Intelligent Living Room Lighting ⭐ v1.4
 
 ### Key Features
 
@@ -265,13 +265,20 @@ Result: No flicker, instant response, reliable operation.
 - [🔬 Anti-Flicker Technical Guide](blueprints/ANTI_FLICKER_TECHNICAL_GUIDE.md) - Deep dive into hysteresis logic
 - [📡 FP2 Features Reference](blueprints/FP2_FEATURES_REFERENCE.md) - Aqara FP2 capabilities
 
-### Recent Enhancements (v1.3) ⭐ SIMPLIFIED + OPTIMIZED
+### Recent Enhancements (v1.4) ⭐ LUX MONITORING FIXED
+
+- ✅ **CRITICAL FIX: Lux Numeric State Trigger** - Automation now fires when lux exceeds threshold
+- ✅ **Immediate Turn-Off When Bright** - Lights turn off as soon as room becomes bright (sunrise, curtains)
+- ✅ **Independent of Presence Loop** - No longer relies only on 60-second loop checks
+- ✅ **Respects Override/Scene** - Won't turn off if override or scene is active
+- ✅ **Fixes Sunny Day Issue** - Lights no longer stay on all day in bright rooms
+
+### Previous Enhancements (v1.3)
 
 - ✅ **Removed Debounce Wait** - Lights turn on/off instantly when lux thresholds crossed
 - ✅ **Fixed Turn-On Blocking** - Removed wait_template with continue_on_timeout: false
 - ✅ **Optimized Turn-Off Timing** - Day: 15/20/25 min (was 30/40/45), Night: 5/10/15 min
 - ✅ **Cleaner Configuration** - Removed 3 unused debounce inputs
-- ✅ **Same Fix as Adjacent Zone v1.4** - Prevents automation exit on lux fluctuations
 
 ### Previous Enhancements (v1.2)
 
@@ -297,7 +304,7 @@ Result: No flicker, instant response, reliable operation.
 
 ---
 
-## Adjacent Zone Motion Sensor with Circadian Lighting ⭐ v1.4
+## Adjacent Zone Motion Sensor with Circadian Lighting ⭐ v1.5
 
 ### Key Features
 
@@ -401,7 +408,15 @@ override_entity: input_boolean.hallway_override
 
 **If motion detected during any stage:** Automation restarts from T+0 (lights back to 100%)
 
-### Recent Enhancements (v1.4) ⭐ TURN-ON NOW WORKS + FASTER TURN-OFF
+### Recent Enhancements (v1.5) ⭐ LUX MONITORING FIXED
+
+- ✅ **CRITICAL FIX: Lux Numeric State Trigger** - Automation now fires when lux exceeds threshold
+- ✅ **Immediate Turn-Off When Bright** - Lights turn off as soon as room becomes bright (sunrise, curtains)
+- ✅ **No More Guessing** - v1.4 only checked lux at motion trigger, never monitored afterward
+- ✅ **Respects Override** - Won't turn off if manual override is active
+- ✅ **Fixes Sunny Day Issue** - Lights no longer stay on all day in bright hallways/bathrooms
+
+### Previous Enhancements (v1.4)
 
 - ✅ **CRITICAL FIX**: Removed debounce wait that prevented lights from turning on
 - ✅ **Immediate Response**: Lights now turn on instantly when motion detected (if lux < 80)
