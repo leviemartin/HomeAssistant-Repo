@@ -12,7 +12,7 @@ This is a Home Assistant blueprint repository containing **5 production blueprin
 /blueprints/                              # Production blueprint files
   circadian_rhythm_lighting.yaml          # Original fixed-time circadian (v1.0)
   circadian_rhythm_lighting_sun_aware.yaml # Sun-tracking circadian (v2.0)
-  intelligent_living_room_mmwave_lux_aware.yaml # mmWave + lux-aware (v1.6)
+  intelligent_living_room_mmwave_lux_aware.yaml # mmWave + lux-aware (v1.7)
   adjacent_zone_motion_circadian_lighting.yaml # Adjacent zone motion (v1.7)
   child_night_light.yaml                  # Child-friendly night light (v1.0)
 
@@ -56,7 +56,7 @@ README.md                                 # Main repository documentation
 
 ### 3. Intelligent Living Room Lighting (mmWave + Lux Aware)
 - **File**: `intelligent_living_room_mmwave_lux_aware.yaml`
-- **Version**: 1.6 (NEW FEATURE - added lux_dropped trigger for complete bidirectional lux monitoring)
+- **Version**: 1.7 (CRITICAL FIX - continuous monitoring loop now runs, circadian colors update every 60 seconds)
 - **Color Range**: 1800K-5500K (warmest baseline in the system)
 - **Special Features**:
   - Aqara FP2 mmWave presence detection
@@ -64,12 +64,19 @@ README.md                                 # Main repository documentation
   - Dynamic brightness scaling (100% @ ≤50 lux → 40% @ 150 lux)
   - Scene cycling system (3 Philips Hue scenes via input_number helper)
   - Optimized turn-off timing (day: 15/20/25 min, night: 5/10/15 min)
-- **NEW FEATURE (v1.6)**: Added lux_dropped trigger for complete lux monitoring
+- **CRITICAL FIX (v1.7)**: Fixed continuous monitoring loop not running + loop variable boolean bugs
+  - v1.6 bug: Branch 2C (lux_dropped) turned on lights then EXITED - no continuous updates
+  - v1.6 bug: loop_override_active, loop_scene_is_active, time_override returned STRING "false"
+  - v1.7 fix: Merged Branch 2C into Branch 3 using OR condition (presence OR lux_dropped)
+  - v1.7 fix: Updated loop variables to use AND chain syntax → returns actual booleans
+  - Result: Continuous loop now runs for both presence_detected and lux_dropped triggers
+  - Result: Circadian colors update every 60 seconds, brightness scales with lux
+  - User report fixed: "Stuck in Option 6, no circadian/brightness changes" - SOLVED!
+- **Previous Feature (v1.6)**: Added lux_dropped trigger for complete lux monitoring
   - v1.5 had only lux_exceeded trigger (turn OFF when bright)
   - v1.6 adds lux_dropped trigger (turn ON when dark)
   - Trigger 6: `numeric_state below lux_turn_on_threshold`
-  - Branch 2C handles lux_dropped, checks presence, respects scenes
-  - Result: Lights turn ON immediately when room darkens during presence (sunset, curtains closed)
+  - Lights turn ON immediately when room darkens during presence (sunset, curtains closed)
   - Safety: Only activates if presence detected (won't light empty room)
 - **Previous Fix (v1.5)**: Fixed string vs boolean bug in override_active and scene_is_active variables
   - v1.4 bug: Variables returned STRING "false" instead of BOOLEAN false
