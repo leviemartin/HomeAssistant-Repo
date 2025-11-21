@@ -32,8 +32,8 @@ https://raw.githubusercontent.com/leviemartin/HomeAssistant-Repo/main/blueprints
 
 [📖 Quick Start](blueprints/INTELLIGENT_LIVING_ROOM_QUICK_START.md) | [📘 Complete Setup Guide](blueprints/INTELLIGENT_LIVING_ROOM_SETUP_GUIDE.md) | [🔬 Anti-Flicker Technical Guide](blueprints/ANTI_FLICKER_TECHNICAL_GUIDE.md) | [📡 FP2 Features Reference](blueprints/FP2_FEATURES_REFERENCE.md)
 
-### 4. Adjacent Zone Motion Sensor with Circadian Lighting ⭐ v1.6
-Motion-activated lighting for hallways, bathrooms, and stairs with GUARANTEED color consistency to the living room blueprint. Uses identical circadian formulas (1800K-5500K) with hardcoded Quick timing (5/10/15 min = 15 min total) optimized for quick-transition spaces. **CRITICAL FIX v1.6:** Adds lux numeric_state trigger so lights turn off when room becomes bright! **Finally works reliably in sunny conditions!**
+### 4. Adjacent Zone Motion Sensor with Circadian Lighting ⭐ v1.7
+Motion-activated lighting for hallways, bathrooms, and stairs with GUARANTEED color consistency to the living room blueprint. Uses identical circadian formulas (1800K-5500K) with hardcoded Quick timing (5/10/15 min = 15 min total) optimized for quick-transition spaces. **NEW v1.7:** Lux sensor is now OPTIONAL - perfect for windowless bathrooms where motion should ALWAYS turn on lights! **v1.6:** Added lux trigger for sunny conditions.
 
 **Import URL:**
 ```
@@ -320,12 +320,15 @@ Result: No flicker, instant response, reliable operation.
 
 ---
 
-## Adjacent Zone Motion Sensor with Circadian Lighting ⭐ v1.6
+## Adjacent Zone Motion Sensor with Circadian Lighting ⭐ v1.7
 
 ### Key Features
 
 - **100% Color Consistency** - Extracted IDENTICAL circadian formulas from living room blueprint
-- **Hardcoded Lux Thresholds** - 150/80 lux (not configurable) for guaranteed matching
+- **Optional Lux Sensor (v1.7 NEW)** - Lux sensor is now optional! Perfect for windowless bathrooms
+  - Without lux sensor: Motion ALWAYS turns on lights
+  - With lux sensor: Uses hardcoded 150/80 lux thresholds for living room consistency
+- **Hardcoded Lux Thresholds** - 150/80 lux (when lux sensor configured) for guaranteed matching
 - **Hardcoded Quick Timing** - 5/10/15 minutes (simplified, no presets)
   - 5 min initial wait (motion must clear completely)
   - 5 min Stage 1 delay (40% brightness, 1800K warm)
@@ -424,7 +427,15 @@ override_entity: input_boolean.hallway_override
 
 **If motion detected during any stage:** Automation restarts from T+0 (lights back to 100%)
 
-### Recent Enhancements (v1.6) ⭐ LUX MONITORING FIXED
+### Recent Enhancements (v1.7) ⭐ OPTIONAL LUX SENSOR
+
+- ✅ **NEW: Optional Lux Sensor** - Lux sensor is now completely optional (leave empty to disable)
+- ✅ **Perfect for Windowless Bathrooms** - Motion always turns on lights when no lux sensor configured
+- ✅ **Automatic Behavior Switching** - With sensor: uses lux checks; without sensor: always on with motion
+- ✅ **Example Use Cases** - Bathrooms, closets, utility rooms without windows or natural light
+- ✅ **Still Compatible** - Existing configurations with lux sensors work unchanged
+
+### Previous Enhancements (v1.6)
 
 - ✅ **CRITICAL FIX: Lux Numeric State Trigger** - Automation now fires when lux exceeds threshold (150 lux hardcoded)
 - ✅ **Import Error Fixed** - v1.5 had bug referencing non-existent input, v1.6 uses hardcoded value
