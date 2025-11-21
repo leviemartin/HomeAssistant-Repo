@@ -1,15 +1,16 @@
 blueprint:
-  name: Intelligent Living Room - mmWave + Lux-Aware v1.6
+  name: Intelligent Living Room - mmWave + Lux-Aware v1.7
   description: >
     Professional-grade lighting automation combining mmWave presence detection,
     lux-aware hysteresis anti-flicker logic, staged turn-off sequences, dynamic
     brightness adjustment, sun-aware circadian rhythm, and Philips Hue scene cycling.
 
 
-    This is v1.6 - NEW FEATURE: Added lux_dropped trigger for immediate turn-on when room
-    darkens during presence (e.g., sunset, curtains closed). Now has BOTH lux triggers:
-    lux_exceeded (turn OFF when bright) AND lux_dropped (turn ON when dark). Completes
-    the responsive lux monitoring system. v1.5 fixed boolean bug, v1.4 added lux_exceeded.
+    This is v1.7 - CRITICAL FIX: Fixed continuous monitoring loop not running after
+    lux_dropped trigger. Also fixed loop variables (loop_override_active, loop_scene_is_active,
+    time_override) returning strings instead of booleans. Merged Branch 2C into Branch 3
+    so lux_dropped trigger includes continuous circadian updates. NOW WORKING: Circadian
+    colors and brightness update every 60 seconds! v1.6 added lux_dropped, v1.5 fixed booleans.
 
 
     KEY FEATURES:
@@ -1150,56 +1151,16 @@ action:
                   level: info
 
       # ======================================================================
-      # BRANCH 2C: LUX DROPPED BELOW ON THRESHOLD (TURN ON IF DARK)
+      # BRANCH 3: PRESENCE DETECTED OR LUX DROPPED (MAIN LOGIC + CONTINUOUS UPDATES)
       # ======================================================================
+      # This branch handles BOTH presence detection AND lux_dropped triggers
+      # Both cases need the continuous monitoring loop for circadian updates
       - conditions:
-          - condition: trigger
-            id: lux_dropped
-        sequence:
-          # Lux dropped below ON threshold (room became dark)
-          # Turn on lights ONLY if presence is detected AND no scene is active
-          - choose:
-              # No presence - do nothing (we only respond to lux when someone is there)
-              - conditions:
-                  - condition: state
-                    entity_id: !input presence_sensor
-                    state: "off"
-                sequence:
-                  - service: system_log.write
-                    data:
-                      message: "Lux dropped below {{ lux_on_threshold }} but no presence - not turning on"
-                      level: debug
-
-              # Scene active - preserve scene, don't override with circadian
-              - conditions:
-                  - condition: template
-                    value_template: "{{ scene_is_active }}"
-                sequence:
-                  - service: system_log.write
-                    data:
-                      message: "Lux dropped but scene {{ current_scene_state }} is active - preserving scene"
-                      level: info
-
-            default:
-              # Presence detected and no scene - turn on lights with circadian settings
-              - service: light.turn_on
-                target: !input target_lights
-                data:
-                  brightness_pct: "{{ calculated_brightness }}"
-                  color_temp: "{{ color_temp_mireds }}"
-                  transition: 2
-
-              - service: system_log.write
-                data:
-                  message: "Lights turned on - lux dropped below {{ lux_on_threshold }} (current: {{ current_lux }})"
-                  level: info
-
-      # ======================================================================
-      # BRANCH 3: PRESENCE DETECTED (MAIN LOGIC WITH LUX HYSTERESIS)
-      # ======================================================================
-      - conditions:
-          - condition: trigger
-            id: presence_detected
+          - or:
+              - condition: trigger
+                id: presence_detected
+              - condition: trigger
+                id: lux_dropped
         sequence:
           # === LUX HYSTERESIS CHECK (ANTI-FLICKER LOGIC) ===
           # Only turn on if:
@@ -1318,19 +1279,11 @@ action:
 
                     # Recalculate override state
                     loop_override_active: >
-                      {% if override_system_enabled and override_trigger_entity %}
-                        {{ is_state(override_trigger_entity, 'on') }}
-                      {% else %}
-                        false
-                      {% endif %}
+                      {{ override_system_enabled and override_trigger_entity and is_state(override_trigger_entity, 'on') }}
 
                     # Recalculate scene state
                     loop_scene_is_active: >
-                      {% if scene_cycling_system_enabled and scene_tracker_entity %}
-                        {{ (states(scene_tracker_entity) | int(0)) > 0 }}
-                      {% else %}
-                        false
-                      {% endif %}
+                      {{ scene_cycling_system_enabled and scene_tracker_entity and (states(scene_tracker_entity) | int(0)) > 0 }}
 
                 # Update lights with current circadian color and dynamic brightness
                 # But SKIP if scene is active (scene overrides circadian)
@@ -1513,11 +1466,7 @@ action:
                 {% endif %}
 
               time_override: >
-                {% if override_system_enabled and override_trigger_entity %}
-                  {{ is_state(override_trigger_entity, 'on') }}
-                {% else %}
-                  false
-                {% endif %}
+                {{ override_system_enabled and override_trigger_entity and is_state(override_trigger_entity, 'on') }}
 
           # Update color temperature based on current sun position
           # Only if lux allows OR override is active
