@@ -1,13 +1,14 @@
 blueprint:
-  name: Adjacent Zone Motion - Circadian Lighting v1.4
+  name: Adjacent Zone Motion - Circadian Lighting v1.5
   description: >
     Motion-activated lighting for hallways, bathrooms, and stairs with EXACT color
     consistency to the Intelligent Living Room blueprint. Features lux-aware control,
     circadian rhythm, staged turn-off warnings, and configurable brightness controls.
 
 
-    This is v1.4 - CRITICAL BUG FIX: Removes debounce wait on turn-ON that was
-    preventing lights from turning on when lux fluctuated during the 2-minute wait
+    This is v1.5 - CRITICAL BUG FIX: Adds lux numeric_state trigger so lights turn
+    off when room becomes bright (sunrise, curtains opened). v1.4 only checked lux at
+    motion trigger time and never monitored it afterward
     period. Simplified turn-on logic for immediate response while maintaining all
     anti-flicker protection via simple threshold checks.
 
@@ -492,6 +493,14 @@ trigger:
     entity_id: !input override_trigger
     id: override_toggled
 
+  # === TRIGGER 3: LUX EXCEEDED THRESHOLD ===
+  # Lux sensor triggers when ambient light exceeds OFF threshold
+  # This allows lights to turn off when room becomes bright (e.g., sunrise, curtains opened)
+  - platform: numeric_state
+    entity_id: !input lux_sensor
+    above: !input lux_turn_off_threshold
+    id: lux_exceeded
+
 action:
   # === ACTION FLOW DECISION TREE ===
   - choose:
@@ -512,7 +521,37 @@ action:
               level: info
 
       # ======================================================================
-      # BRANCH 2: MOTION DETECTED (MAIN LOGIC - v1.4 SIMPLIFIED TURN-ON)
+      # BRANCH 2: LUX EXCEEDED THRESHOLD (TURN OFF IF BRIGHT)
+      # ======================================================================
+      - conditions:
+          - condition: trigger
+            id: lux_exceeded
+        sequence:
+          # Lux exceeded OFF threshold (room became bright)
+          # Turn off lights UNLESS override is active
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ override_active }}"
+                sequence:
+                  - service: system_log.write
+                    data:
+                      message: "Lux exceeded {{ lux_off_threshold }} but override is active - keeping lights on"
+                      level: info
+            default:
+              # No override - turn off lights due to high ambient light
+              - service: light.turn_off
+                target: !input target_lights
+                data:
+                  transition: 5
+
+              - service: system_log.write
+                data:
+                  message: "Lights turned off - lux exceeded {{ lux_off_threshold }} (current: {{ current_lux }})"
+                  level: info
+
+      # ======================================================================
+      # BRANCH 3: MOTION DETECTED (MAIN LOGIC - v1.4 SIMPLIFIED TURN-ON)
       # ======================================================================
       - conditions:
           - condition: trigger

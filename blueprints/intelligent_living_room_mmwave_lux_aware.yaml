@@ -1,12 +1,14 @@
 blueprint:
-  name: Intelligent Living Room - mmWave + Lux-Aware v1.3
+  name: Intelligent Living Room - mmWave + Lux-Aware v1.4
   description: >
     Professional-grade lighting automation combining mmWave presence detection,
     lux-aware hysteresis anti-flicker logic, staged turn-off sequences, dynamic
     brightness adjustment, sun-aware circadian rhythm, and Philips Hue scene cycling.
 
 
-    This is v1.3 - simplified turn-on logic (no debounce wait) + optimized turn-off timing.
+    This is v1.4 - CRITICAL BUG FIX: Adds lux numeric_state trigger so lights turn
+    off immediately when room becomes bright (sunrise, curtains opened). v1.3 relied
+    only on 60-second loop checks which could miss lux changes.
 
 
     KEY FEATURES:
@@ -834,6 +836,15 @@ trigger:
     minutes: "/1"
     id: circadian_update
 
+  # === TRIGGER 5: LUX EXCEEDED THRESHOLD ===
+  # Lux sensor triggers when ambient light exceeds OFF threshold
+  # This allows lights to turn off when room becomes bright (e.g., sunrise, curtains opened)
+  # Works independently of the 60-second loop check for faster response
+  - platform: numeric_state
+    entity_id: !input lux_sensor
+    above: !input lux_turn_off_threshold
+    id: lux_exceeded
+
 action:
   # === ACTION FLOW DECISION TREE ===
   - choose:
@@ -1105,6 +1116,36 @@ action:
                 target: !input target_lights
                 data:
                   transition: 3
+
+      # ======================================================================
+      # BRANCH 2B: LUX EXCEEDED THRESHOLD (TURN OFF IF BRIGHT)
+      # ======================================================================
+      - conditions:
+          - condition: trigger
+            id: lux_exceeded
+        sequence:
+          # Lux exceeded OFF threshold (room became bright)
+          # Turn off lights UNLESS override or scene is active
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ override_active or scene_is_active }}"
+                sequence:
+                  - service: system_log.write
+                    data:
+                      message: "Lux exceeded {{ lux_off_threshold }} but override/scene is active - keeping lights on"
+                      level: info
+            default:
+              # No override/scene - turn off lights due to high ambient light
+              - service: light.turn_off
+                target: !input target_lights
+                data:
+                  transition: 5
+
+              - service: system_log.write
+                data:
+                  message: "Lights turned off - lux exceeded {{ lux_off_threshold }} (current: {{ current_lux }})"
+                  level: info
 
       # ======================================================================
       # BRANCH 3: PRESENCE DETECTED (MAIN LOGIC WITH LUX HYSTERESIS)
