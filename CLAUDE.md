@@ -56,7 +56,7 @@ README.md                                 # Main repository documentation
 
 ### 3. Intelligent Living Room Lighting (mmWave + Lux Aware)
 - **File**: `intelligent_living_room_mmwave_lux_aware.yaml`
-- **Version**: 1.3 (SIMPLIFIED - removed debounce wait + optimized timing)
+- **Version**: 1.4 (CRITICAL - added lux numeric_state trigger for proper monitoring)
 - **Color Range**: 1800K-5500K (warmest baseline in the system)
 - **Special Features**:
   - Aqara FP2 mmWave presence detection
@@ -64,16 +64,19 @@ README.md                                 # Main repository documentation
   - Dynamic brightness scaling (100% @ ≤50 lux → 40% @ 150 lux)
   - Scene cycling system (3 Philips Hue scenes via input_number helper)
   - Optimized turn-off timing (day: 15/20/25 min, night: 5/10/15 min)
-- **CRITICAL BUG FIX (v1.3)**: Removed debounce wait_template that could block turn-on
-  - v1.2 bug: wait_template with continue_on_timeout: false exits on lux fluctuations
-  - v1.3 fix: Immediate turn-on/off when lux thresholds crossed (same fix as Adjacent Zone v1.4)
-  - Result: Reliable turn-on, instant response, hysteresis alone provides anti-flicker
+- **CRITICAL BUG FIX (v1.4)**: Added lux numeric_state trigger for proper lux monitoring
+  - v1.3 bug: Only checked lux in 60-second loop, could miss rapid changes or have delays
+  - v1.4 fix: Added trigger that fires when lux > 150 (OFF threshold)
+  - Result: Lights turn off immediately when room becomes bright (sunrise, curtains opened)
+  - Branch 2B handles lux_exceeded trigger, respects override/scene settings
+- **Previous Fix (v1.3)**: Removed debounce wait_template that could block turn-on
+  - Immediate turn-on/off when lux thresholds crossed
 - **Previous Fix (v1.2)**: Variables recalculated inside continuous presence loop
   - Fresh `loop_*` variables recalculated every 60 seconds for circadian/brightness updates
 
 ### 4. Adjacent Zone Motion Sensor
 - **File**: `adjacent_zone_motion_circadian_lighting.yaml`
-- **Version**: 1.4 (FIXED - turn-on now works + optimized timing)
+- **Version**: 1.5 (CRITICAL - added lux numeric_state trigger for proper monitoring)
 - **Color Range**: 1800K-5500K (IDENTICAL to living room for color consistency)
 - **Design Philosophy**: **100% color consistency with living room blueprint**
   - Extracted EXACT same sun elevation → Kelvin formula
@@ -81,9 +84,16 @@ README.md                                 # Main repository documentation
   - Hardcoded brightness curve - exact match to living room
   - Result: Adjacent zones always match living room color temperature
 - **Special Features**:
-  - Zone preset system (Very Quick 3/5/7 min, Quick 5/10/15 min, Medium 10/15/20 min)
-  - Shorter turn-off intervals than living room (optimized for hallways/bathrooms)
+  - Hardcoded Quick timing (5/10/15 min = 15 min total) - optimized for hallways/bathrooms
   - Configurable brightness curve (v1.1 update)
+  - PIR motion sensor compatible (Philips Hue, Aqara P1)
+- **CRITICAL BUG FIX (v1.5)**: Added lux numeric_state trigger for proper lux monitoring
+  - v1.4 bug: Only checked lux at motion trigger time, never monitored during wait periods
+  - v1.5 fix: Added trigger that fires when lux > 150 (OFF threshold)
+  - Result: Lights turn off immediately when room becomes bright (sunrise, curtains opened)
+  - Branch 2 handles lux_exceeded trigger, respects override settings
+- **Previous Fix (v1.4)**: Removed debounce wait_template that could block turn-on
+  - Immediate turn-on, faster timing (15 min total)
 
 ### 5. Child-Friendly Night Light
 - **File**: `child_night_light.yaml`
@@ -281,6 +291,38 @@ data: >
   target: !input lights
   data:
     brightness_pct: "{{ brightness }}"
+```
+
+### Issue: Lights staying on all day in sunny conditions
+**Cause**: Missing lux sensor numeric_state trigger - automation never fires when lux changes
+**Fix**: Add numeric_state trigger that fires when lux exceeds OFF threshold (v1.4/v1.5 fix)
+```yaml
+# BAD (v1.3/v1.4 bug):
+trigger:
+  - platform: state
+    entity_id: !input motion_sensor
+    to: "on"
+# ← Only motion triggers, lux changes ignored!
+
+# GOOD (v1.4/v1.5 fix):
+trigger:
+  - platform: state
+    entity_id: !input motion_sensor
+    to: "on"
+  - platform: numeric_state
+    entity_id: !input lux_sensor
+    above: !input lux_turn_off_threshold
+    id: lux_exceeded  # ← Automation fires when bright!
+
+# Then add action branch:
+- conditions:
+    - condition: trigger
+      id: lux_exceeded
+  sequence:
+    - service: light.turn_off
+      target: !input lights
+      data:
+        transition: 5
 ```
 
 ### Issue: Transition values causing errors
