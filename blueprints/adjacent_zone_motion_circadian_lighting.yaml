@@ -1,16 +1,16 @@
 blueprint:
-  name: Adjacent Zone Motion - Circadian Lighting v1.6
+  name: Adjacent Zone Motion - Circadian Lighting v1.7
   description: >
     Motion-activated lighting for hallways, bathrooms, and stairs with EXACT color
-    consistency to the Intelligent Living Room blueprint. Features lux-aware control,
-    circadian rhythm, staged turn-off warnings, and configurable brightness controls.
+    consistency to the Intelligent Living Room blueprint. Features optional lux-aware
+    control, circadian rhythm, staged turn-off warnings, and configurable brightness.
 
 
-    This is v1.6 - CRITICAL BUG FIX: Adds lux numeric_state trigger so lights turn
-    off when room becomes bright (sunrise, curtains opened). v1.4 only checked lux at
-    motion trigger time. v1.5 had import error (referenced non-existent input)
-    period. Simplified turn-on logic for immediate response while maintaining all
-    anti-flicker protection via simple threshold checks.
+    This is v1.7 - NEW FEATURE: Lux sensor is now OPTIONAL! Perfect for windowless
+    bathrooms where motion should ALWAYS turn on lights. When lux sensor is not
+    configured, motion detection automatically activates lights (no lux checks). When
+    lux sensor IS configured, maintains hardcoded thresholds (80/150 lux) for color
+    consistency with living room. v1.6 added lux trigger, v1.5 fixed import error.
 
 
     This blueprint is OPTIMIZED for adjacent zones like hallways, bathrooms, stairs,
@@ -103,11 +103,14 @@ blueprint:
               device_class: motion
 
     lux_sensor:
-      name: Lux/Illuminance Sensor
+      name: Lux/Illuminance Sensor (Optional)
       description: >
-        Ambient light sensor for lux-aware control. Can be built-in sensor from motion
-        detector or separate illuminance sensor. Critical for anti-flicker hysteresis.
-        Hardcoded thresholds: 80 lux (ON) / 150 lux (OFF) for consistency with living room.
+        OPTIONAL ambient light sensor for lux-aware control. Can be built-in sensor from
+        motion detector or separate illuminance sensor. If NOT configured, lights will
+        ALWAYS turn on with motion (perfect for windowless bathrooms). If configured,
+        uses hardcoded thresholds: 80 lux (ON) / 150 lux (OFF) for consistency with
+        living room. Leave empty for rooms without windows or natural light.
+      default: {}
       selector:
         entity:
           filter:
@@ -317,6 +320,11 @@ variables:
   motion_sensor_entity: !input motion_sensor
   override_trigger_entity: !input override_trigger
 
+  # === LUX SENSOR AVAILABILITY CHECK ===
+  # Check if lux sensor is configured (for optional lux-aware control)
+  lux_sensor_enabled: >
+    {{ lux_sensor_entity not in [none, '', 'unavailable', 'unknown'] and lux_sensor_entity | length > 0 }}
+
   # === HARDCODED TIMING (v1.3 SIMPLIFIED) ===
   # Stage delays are now fixed for hallway/bathroom use case
   # Stage 1: First warning at 5 minutes
@@ -357,7 +365,13 @@ variables:
   circadian_transition_sec: !input circadian_transition_duration
 
   # === CURRENT LUX READING ===
-  current_lux: "{{ states(lux_sensor_entity) | float(0) }}"
+  # If lux sensor is configured, read its value; otherwise return 0 (will skip lux checks)
+  current_lux: >
+    {% if lux_sensor_enabled %}
+      {{ states(lux_sensor_entity) | float(0) }}
+    {% else %}
+      0
+    {% endif %}
 
   # === SUN POSITION DATA ===
   sun_elevation: "{{ state_attr('sun.sun', 'elevation') | float(0) }}"
@@ -493,14 +507,9 @@ trigger:
     entity_id: !input override_trigger
     id: override_toggled
 
-  # === TRIGGER 3: LUX EXCEEDED THRESHOLD ===
-  # Lux sensor triggers when ambient light exceeds OFF threshold
-  # This allows lights to turn off when room becomes bright (e.g., sunrise, curtains opened)
-  # Hardcoded to 150 lux (matches hardcoded variable lux_off_threshold)
-  - platform: numeric_state
-    entity_id: !input lux_sensor
-    above: 150
-    id: lux_exceeded
+  # NOTE: Lux sensor trigger removed in v1.7 to support optional lux sensor.
+  # When lux sensor is not configured (windowless bathrooms), motion always turns on lights.
+  # Lux monitoring during continuous presence loop still active when sensor is configured.
 
 action:
   # === ACTION FLOW DECISION TREE ===
@@ -521,51 +530,21 @@ action:
               message: "Adjacent Zone: Override toggled. New state: {{ override_active }}"
               level: info
 
-      # ======================================================================
-      # BRANCH 2: LUX EXCEEDED THRESHOLD (TURN OFF IF BRIGHT)
-      # ======================================================================
-      - conditions:
-          - condition: trigger
-            id: lux_exceeded
-        sequence:
-          # Lux exceeded OFF threshold (room became bright)
-          # Turn off lights UNLESS override is active
-          - choose:
-              - conditions:
-                  - condition: template
-                    value_template: "{{ override_active }}"
-                sequence:
-                  - service: system_log.write
-                    data:
-                      message: "Lux exceeded {{ lux_off_threshold }} but override is active - keeping lights on"
-                      level: info
-            default:
-              # No override - turn off lights due to high ambient light
-              - service: light.turn_off
-                target: !input target_lights
-                data:
-                  transition: 5
-
-              - service: system_log.write
-                data:
-                  message: "Lights turned off - lux exceeded {{ lux_off_threshold }} (current: {{ current_lux }})"
-                  level: info
+      # NOTE: Branch 2 (lux_exceeded) removed in v1.7 to support optional lux sensor.
+      # Lux-based turn-off is now handled within the continuous presence loop in Branch 2.
 
       # ======================================================================
-      # BRANCH 3: MOTION DETECTED (MAIN LOGIC - v1.4 SIMPLIFIED TURN-ON)
+      # BRANCH 2: MOTION DETECTED (MAIN LOGIC - v1.7 OPTIONAL LUX)
       # ======================================================================
       - conditions:
           - condition: trigger
             id: motion_detected
         sequence:
-          # === STEP 1: TURN ON LIGHTS (SIMPLIFIED - v1.4 CRITICAL FIX) ===
-          # v1.4 CHANGE: Removed the debounce wait that was preventing lights from
-          # turning on. Debounce is only needed for turn-OFF to prevent flicker.
-          # For turn-ON, we just check lux threshold once at trigger time.
-          #
-          # Turn on if:
+          # === STEP 1: TURN ON LIGHTS (v1.7 - OPTIONAL LUX) ===
+          # Turn on lights if ANY of these conditions are true:
           # 1. Override is active (ignore lux), OR
-          # 2. Lux is below ON threshold (80 lux)
+          # 2. No lux sensor configured (always turn on for windowless bathrooms), OR
+          # 3. Lux sensor configured AND lux is below ON threshold (80 lux)
 
           - choose:
               # === OPTION A: Override active - turn on immediately ===
@@ -580,10 +559,10 @@ action:
                       color_temp: "{{ color_temp_mireds }}"
                       transition: 2
 
-              # === OPTION B: Lux below threshold - turn on immediately ===
+              # === OPTION B: No lux sensor OR lux below threshold - turn on immediately ===
               - conditions:
                   - condition: template
-                    value_template: "{{ current_lux < lux_on_threshold }}"
+                    value_template: "{{ not lux_sensor_enabled or current_lux < lux_on_threshold }}"
                 sequence:
                   - service: light.turn_on
                     target: !input target_lights
@@ -593,6 +572,7 @@ action:
                       transition: 2
 
             # If neither condition met (lux too high, no override) - do nothing and exit
+            # This only happens when lux sensor IS configured AND lux is above threshold
 
           # === STEP 2: WAIT FOR MOTION TO CLEAR (v1.3 PIR-COMPATIBLE APPROACH) ===
           # This is the CRITICAL FIX for PIR sensor compatibility.
