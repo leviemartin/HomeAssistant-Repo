@@ -22,8 +22,8 @@ https://raw.githubusercontent.com/leviemartin/HomeAssistant-Repo/main/blueprints
 
 [📖 Quick Start Guide](blueprints/QUICK_START.md) | [🔬 Scientific Details](blueprints/SUN_AWARE_UPGRADE_GUIDE.md) | [⚖️ Feature Comparison](blueprints/FEATURE_COMPARISON.md)
 
-### 3. Intelligent Living Room Lighting (mmWave + Lux Aware) ⭐ v1.5
-Advanced living room automation with Aqara FP2 mmWave presence detection, natural light awareness, and anti-flicker protection. Features sun-aware circadian rhythm integration, dynamic brightness scaling, optimized turn-off timing (day: 15/20/25 min, night: 5/10/15 min), scene cycling (cycle through 3 Philips Hue scenes). **CRITICAL FIX v1.5:** Fixed string vs boolean bug that prevented automation from executing any actions! **v1.4:** Added lux numeric_state trigger for immediate turn-off when bright.
+### 3. Intelligent Living Room Lighting (mmWave + Lux Aware) ⭐ v1.6
+Advanced living room automation with Aqara FP2 mmWave presence detection, natural light awareness, and anti-flicker protection. Features sun-aware circadian rhythm integration, dynamic brightness scaling, optimized turn-off timing (day: 15/20/25 min, night: 5/10/15 min), scene cycling (cycle through 3 Philips Hue scenes). **NEW v1.6:** Added lux_dropped trigger - lights now turn ON immediately when room darkens during presence! **v1.5:** Fixed boolean bug. **v1.4:** Added lux_exceeded trigger.
 
 **Import URL:**
 ```
@@ -265,7 +265,15 @@ Result: No flicker, instant response, reliable operation.
 - [🔬 Anti-Flicker Technical Guide](blueprints/ANTI_FLICKER_TECHNICAL_GUIDE.md) - Deep dive into hysteresis logic
 - [📡 FP2 Features Reference](blueprints/FP2_FEATURES_REFERENCE.md) - Aqara FP2 capabilities
 
-### Recent Enhancements (v1.5) ⭐ AUTOMATION FINALLY WORKING
+### Recent Enhancements (v1.6) ⭐ COMPLETE LUX MONITORING
+
+- ✅ **NEW: Lux-Dropped Trigger** - Lights turn ON immediately when room darkens during presence
+- ✅ **Bidirectional Lux Response** - Now monitors BOTH brightening (turn OFF) AND darkening (turn ON)
+- ✅ **Example: Sunset** - Lux drops 90 → 75 (crosses threshold) → Lights turn ON instantly
+- ✅ **Example: Curtains** - Close curtains → Lux drops → Immediate light turn-on
+- ✅ **Safety: Presence Required** - Only turns on if presence detected (won't light empty room)
+
+### Previous Enhancements (v1.5)
 
 - ✅ **CRITICAL FIX: String vs Boolean Bug** - Fixed override_active and scene_is_active returning strings instead of booleans
 - ✅ **Automation Now Executes Actions** - Branch 4 (circadian_update) conditions now evaluate correctly
