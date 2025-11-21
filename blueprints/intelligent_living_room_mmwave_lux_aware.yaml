@@ -1,14 +1,15 @@
 blueprint:
-  name: Intelligent Living Room - mmWave + Lux-Aware v1.5
+  name: Intelligent Living Room - mmWave + Lux-Aware v1.6
   description: >
     Professional-grade lighting automation combining mmWave presence detection,
     lux-aware hysteresis anti-flicker logic, staged turn-off sequences, dynamic
     brightness adjustment, sun-aware circadian rhythm, and Philips Hue scene cycling.
 
 
-    This is v1.5 - CRITICAL BUG FIX: Fixed override_active and scene_is_active variables
-    returning strings instead of booleans, which blocked circadian_update branch from
-    executing. v1.4 added lux trigger but variables bug prevented automation from working.
+    This is v1.6 - NEW FEATURE: Added lux_dropped trigger for immediate turn-on when room
+    darkens during presence (e.g., sunset, curtains closed). Now has BOTH lux triggers:
+    lux_exceeded (turn OFF when bright) AND lux_dropped (turn ON when dark). Completes
+    the responsive lux monitoring system. v1.5 fixed boolean bug, v1.4 added lux_exceeded.
 
 
     KEY FEATURES:
@@ -828,7 +829,7 @@ trigger:
     minutes: "/1"
     id: circadian_update
 
-  # === TRIGGER 5: LUX EXCEEDED THRESHOLD ===
+  # === TRIGGER 5: LUX EXCEEDED OFF THRESHOLD ===
   # Lux sensor triggers when ambient light exceeds OFF threshold
   # This allows lights to turn off when room becomes bright (e.g., sunrise, curtains opened)
   # Works independently of the 60-second loop check for faster response
@@ -836,6 +837,15 @@ trigger:
     entity_id: !input lux_sensor
     above: !input lux_turn_off_threshold
     id: lux_exceeded
+
+  # === TRIGGER 6: LUX DROPPED BELOW ON THRESHOLD ===
+  # Lux sensor triggers when ambient light drops below ON threshold
+  # This allows lights to turn on when room becomes dark (e.g., sunset, curtains closed)
+  # Works independently of the 60-second loop check for faster response
+  - platform: numeric_state
+    entity_id: !input lux_sensor
+    below: !input lux_turn_on_threshold
+    id: lux_dropped
 
 action:
   # === ACTION FLOW DECISION TREE ===
@@ -1137,6 +1147,51 @@ action:
               - service: system_log.write
                 data:
                   message: "Lights turned off - lux exceeded {{ lux_off_threshold }} (current: {{ current_lux }})"
+                  level: info
+
+      # ======================================================================
+      # BRANCH 2C: LUX DROPPED BELOW ON THRESHOLD (TURN ON IF DARK)
+      # ======================================================================
+      - conditions:
+          - condition: trigger
+            id: lux_dropped
+        sequence:
+          # Lux dropped below ON threshold (room became dark)
+          # Turn on lights ONLY if presence is detected AND no scene is active
+          - choose:
+              # No presence - do nothing (we only respond to lux when someone is there)
+              - conditions:
+                  - condition: state
+                    entity_id: !input presence_sensor
+                    state: "off"
+                sequence:
+                  - service: system_log.write
+                    data:
+                      message: "Lux dropped below {{ lux_on_threshold }} but no presence - not turning on"
+                      level: debug
+
+              # Scene active - preserve scene, don't override with circadian
+              - conditions:
+                  - condition: template
+                    value_template: "{{ scene_is_active }}"
+                sequence:
+                  - service: system_log.write
+                    data:
+                      message: "Lux dropped but scene {{ current_scene_state }} is active - preserving scene"
+                      level: info
+
+            default:
+              # Presence detected and no scene - turn on lights with circadian settings
+              - service: light.turn_on
+                target: !input target_lights
+                data:
+                  brightness_pct: "{{ calculated_brightness }}"
+                  color_temp: "{{ color_temp_mireds }}"
+                  transition: 2
+
+              - service: system_log.write
+                data:
+                  message: "Lights turned on - lux dropped below {{ lux_on_threshold }} (current: {{ current_lux }})"
                   level: info
 
       # ======================================================================
