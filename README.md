@@ -22,8 +22,8 @@ https://raw.githubusercontent.com/leviemartin/HomeAssistant-Repo/main/blueprints
 
 [📖 Quick Start Guide](blueprints/QUICK_START.md) | [🔬 Scientific Details](blueprints/SUN_AWARE_UPGRADE_GUIDE.md) | [⚖️ Feature Comparison](blueprints/FEATURE_COMPARISON.md)
 
-### 3. Intelligent Living Room Lighting (mmWave + Lux Aware) ⭐ v1.6
-Advanced living room automation with Aqara FP2 mmWave presence detection, natural light awareness, and anti-flicker protection. Features sun-aware circadian rhythm integration, dynamic brightness scaling, optimized turn-off timing (day: 15/20/25 min, night: 5/10/15 min), scene cycling (cycle through 3 Philips Hue scenes). **NEW v1.6:** Added lux_dropped trigger - lights now turn ON immediately when room darkens during presence! **v1.5:** Fixed boolean bug. **v1.4:** Added lux_exceeded trigger.
+### 3. Intelligent Living Room Lighting (mmWave + Lux Aware) ⭐ v1.7
+Advanced living room automation with Aqara FP2 mmWave presence detection, natural light awareness, and anti-flicker protection. Features sun-aware circadian rhythm integration, dynamic brightness scaling, optimized turn-off timing (day: 15/20/25 min, night: 5/10/15 min), scene cycling (cycle through 3 Philips Hue scenes). **CRITICAL FIX v1.7:** Fixed continuous monitoring loop not running - circadian colors and brightness now update every 60 seconds! **v1.6:** Added lux_dropped trigger. **v1.5:** Fixed boolean bug.
 
 **Import URL:**
 ```
@@ -265,7 +265,15 @@ Result: No flicker, instant response, reliable operation.
 - [🔬 Anti-Flicker Technical Guide](blueprints/ANTI_FLICKER_TECHNICAL_GUIDE.md) - Deep dive into hysteresis logic
 - [📡 FP2 Features Reference](blueprints/FP2_FEATURES_REFERENCE.md) - Aqara FP2 capabilities
 
-### Recent Enhancements (v1.6) ⭐ COMPLETE LUX MONITORING
+### Recent Enhancements (v1.7) ⭐ CONTINUOUS UPDATES FIXED
+
+- ✅ **CRITICAL FIX: Continuous Loop Now Runs** - Merged lux_dropped trigger into Branch 3
+- ✅ **Circadian Colors Update Every 60 Seconds** - Loop wasn't running in v1.6, now fixed!
+- ✅ **Brightness Updates Every 60 Seconds** - Dynamic brightness adjusts with changing lux
+- ✅ **Fixed Loop Variable Boolean Bugs** - loop_override_active, loop_scene_is_active, time_override
+- ✅ **User Report Fixed** - "Stuck in Option 6, no circadian/brightness changes" - SOLVED!
+
+### Previous Enhancements (v1.6)
 
 - ✅ **NEW: Lux-Dropped Trigger** - Lights turn ON immediately when room darkens during presence
 - ✅ **Bidirectional Lux Response** - Now monitors BOTH brightening (turn OFF) AND darkening (turn ON)
