@@ -13,7 +13,7 @@ This is a Home Assistant blueprint repository containing **5 production blueprin
   circadian_rhythm_lighting.yaml          # Original fixed-time circadian (v1.0)
   circadian_rhythm_lighting_sun_aware.yaml # Sun-tracking circadian (v2.0)
   intelligent_living_room_mmwave_lux_aware.yaml # mmWave + lux-aware (v1.6)
-  adjacent_zone_motion_circadian_lighting.yaml # Adjacent zone motion (v1.1)
+  adjacent_zone_motion_circadian_lighting.yaml # Adjacent zone motion (v1.7)
   child_night_light.yaml                  # Child-friendly night light (v1.0)
 
   # Blueprint documentation
@@ -89,18 +89,26 @@ README.md                                 # Main repository documentation
 
 ### 4. Adjacent Zone Motion Sensor
 - **File**: `adjacent_zone_motion_circadian_lighting.yaml`
-- **Version**: 1.6 (CRITICAL - added lux numeric_state trigger, fixed v1.5 import error)
+- **Version**: 1.7 (NEW FEATURE - lux sensor is now optional, perfect for windowless bathrooms)
 - **Color Range**: 1800K-5500K (IDENTICAL to living room for color consistency)
 - **Design Philosophy**: **100% color consistency with living room blueprint**
   - Extracted EXACT same sun elevation → Kelvin formula
-  - Hardcoded lux thresholds (150/80) - NOT configurable
-  - Hardcoded brightness curve - exact match to living room
+  - Hardcoded lux thresholds (150/80) when sensor configured - NOT configurable
+  - Optional lux sensor - can be left empty for windowless rooms
   - Result: Adjacent zones always match living room color temperature
 - **Special Features**:
   - Hardcoded Quick timing (5/10/15 min = 15 min total) - optimized for hallways/bathrooms
   - Configurable brightness curve (v1.1 update)
   - PIR motion sensor compatible (Philips Hue, Aqara P1)
-- **CRITICAL BUG FIX (v1.6)**: Added lux numeric_state trigger for proper lux monitoring
+- **NEW FEATURE (v1.7)**: Optional lux sensor for windowless rooms
+  - Lux sensor input now has `default: {}` (optional)
+  - Added `lux_sensor_enabled` variable to check if sensor configured
+  - Turn-on logic: `{{ not lux_sensor_enabled or current_lux < lux_on_threshold }}`
+  - Without sensor: Motion ALWAYS turns on lights (perfect for bathrooms)
+  - With sensor: Uses hardcoded 150/80 lux thresholds (living room consistency)
+  - Removed lux_exceeded trigger (can't be conditional in YAML)
+  - Removed Branch 2 (lux_exceeded action handler)
+- **Previous Fix (v1.6)**: Added lux numeric_state trigger for proper lux monitoring
   - v1.4 bug: Only checked lux at motion trigger time, never monitored during wait periods
   - v1.5 bug: Import error - referenced non-existent `!input lux_turn_off_threshold`
   - v1.6 fix: Uses hardcoded value `above: 150` (matches hardcoded variable lux_off_threshold)
