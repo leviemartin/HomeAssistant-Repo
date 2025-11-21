@@ -1,14 +1,14 @@
 blueprint:
-  name: Intelligent Living Room - mmWave + Lux-Aware v1.4
+  name: Intelligent Living Room - mmWave + Lux-Aware v1.5
   description: >
     Professional-grade lighting automation combining mmWave presence detection,
     lux-aware hysteresis anti-flicker logic, staged turn-off sequences, dynamic
     brightness adjustment, sun-aware circadian rhythm, and Philips Hue scene cycling.
 
 
-    This is v1.4 - CRITICAL BUG FIX: Adds lux numeric_state trigger so lights turn
-    off immediately when room becomes bright (sunrise, curtains opened). v1.3 relied
-    only on 60-second loop checks which could miss lux changes.
+    This is v1.5 - CRITICAL BUG FIX: Fixed override_active and scene_is_active variables
+    returning strings instead of booleans, which blocked circadian_update branch from
+    executing. v1.4 added lux trigger but variables bug prevented automation from working.
 
 
     KEY FEATURES:
@@ -706,11 +706,7 @@ variables:
   # === OVERRIDE SYSTEM STATE ===
   # Check if override is currently active (using input_boolean, binary_sensor, or switch state)
   override_active: >
-    {% if override_system_enabled and override_trigger_entity %}
-      {{ is_state(override_trigger_entity, 'on') }}
-    {% else %}
-      false
-    {% endif %}
+    {{ override_system_enabled and override_trigger_entity and is_state(override_trigger_entity, 'on') }}
 
   # === SCENE CYCLING STATE ===
   # Get current scene state from input_number (0=Off, 1=Scene1, 2=Scene2, 3=Scene3)
@@ -723,11 +719,7 @@ variables:
 
   # Check if ANY scene is currently active (state > 0)
   scene_is_active: >
-    {% if scene_cycling_system_enabled and scene_tracker_entity %}
-      {{ (states(scene_tracker_entity) | int(0)) > 0 }}
-    {% else %}
-      false
-    {% endif %}
+    {{ scene_cycling_system_enabled and scene_tracker_entity and (states(scene_tracker_entity) | int(0)) > 0 }}
 
   # === DYNAMIC BRIGHTNESS CALCULATION ===
   # Brightness scales inversely with lux (brighter outside = dimmer lights)
