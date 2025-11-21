@@ -1,14 +1,14 @@
 blueprint:
-  name: Adjacent Zone Motion - Circadian Lighting v1.5
+  name: Adjacent Zone Motion - Circadian Lighting v1.6
   description: >
     Motion-activated lighting for hallways, bathrooms, and stairs with EXACT color
     consistency to the Intelligent Living Room blueprint. Features lux-aware control,
     circadian rhythm, staged turn-off warnings, and configurable brightness controls.
 
 
-    This is v1.5 - CRITICAL BUG FIX: Adds lux numeric_state trigger so lights turn
+    This is v1.6 - CRITICAL BUG FIX: Adds lux numeric_state trigger so lights turn
     off when room becomes bright (sunrise, curtains opened). v1.4 only checked lux at
-    motion trigger time and never monitored it afterward
+    motion trigger time. v1.5 had import error (referenced non-existent input)
     period. Simplified turn-on logic for immediate response while maintaining all
     anti-flicker protection via simple threshold checks.
 
@@ -496,9 +496,10 @@ trigger:
   # === TRIGGER 3: LUX EXCEEDED THRESHOLD ===
   # Lux sensor triggers when ambient light exceeds OFF threshold
   # This allows lights to turn off when room becomes bright (e.g., sunrise, curtains opened)
+  # Hardcoded to 150 lux (matches hardcoded variable lux_off_threshold)
   - platform: numeric_state
     entity_id: !input lux_sensor
-    above: !input lux_turn_off_threshold
+    above: 150
     id: lux_exceeded
 
 action:
