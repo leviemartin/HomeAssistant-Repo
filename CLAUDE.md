@@ -56,22 +56,24 @@ README.md                                 # Main repository documentation
 
 ### 3. Intelligent Living Room Lighting (mmWave + Lux Aware)
 - **File**: `intelligent_living_room_mmwave_lux_aware.yaml`
-- **Version**: 1.2 (CRITICAL UPDATE - v1.1 had stale variable bugs)
+- **Version**: 1.3 (SIMPLIFIED - removed debounce wait + optimized timing)
 - **Color Range**: 1800K-5500K (warmest baseline in the system)
 - **Special Features**:
   - Aqara FP2 mmWave presence detection
   - Anti-flicker hysteresis (150 lux OFF / 80 lux ON, 50 lux dead band)
   - Dynamic brightness scaling (100% @ ≤50 lux → 40% @ 150 lux)
   - Scene cycling system (3 Philips Hue scenes via input_number helper)
-  - Night mode fast shutdown (5/7/10 min after 22:00 vs 30/40/45 min normal)
-- **CRITICAL BUG FIX (v1.2)**: Variables are now recalculated inside the continuous presence loop
-  - v1.1 bug: Variables calculated once at start, never updated during occupancy
-  - v1.2 fix: Fresh `loop_*` variables recalculated every 60 seconds
-  - Affects: `loop_sun_elevation`, `loop_color_temp_kelvin`, `loop_calculated_brightness`, etc.
+  - Optimized turn-off timing (day: 15/20/25 min, night: 5/10/15 min)
+- **CRITICAL BUG FIX (v1.3)**: Removed debounce wait_template that could block turn-on
+  - v1.2 bug: wait_template with continue_on_timeout: false exits on lux fluctuations
+  - v1.3 fix: Immediate turn-on/off when lux thresholds crossed (same fix as Adjacent Zone v1.4)
+  - Result: Reliable turn-on, instant response, hysteresis alone provides anti-flicker
+- **Previous Fix (v1.2)**: Variables recalculated inside continuous presence loop
+  - Fresh `loop_*` variables recalculated every 60 seconds for circadian/brightness updates
 
 ### 4. Adjacent Zone Motion Sensor
 - **File**: `adjacent_zone_motion_circadian_lighting.yaml`
-- **Version**: 1.1
+- **Version**: 1.4 (FIXED - turn-on now works + optimized timing)
 - **Color Range**: 1800K-5500K (IDENTICAL to living room for color consistency)
 - **Design Philosophy**: **100% color consistency with living room blueprint**
   - Extracted EXACT same sun elevation → Kelvin formula
@@ -263,6 +265,23 @@ data: >
 ### Issue: Circadian colors not updating during occupancy
 **Cause**: Variables calculated once at start, never recalculated in loop (v1.1 bug)
 **Fix**: Add `variables:` block INSIDE repeat loop with `loop_*` prefixed fresh values (v1.2 fix)
+
+### Issue: Lights not turning on despite lux being low
+**Cause**: Debounce wait_template with `continue_on_timeout: false` exits automation if lux fluctuates
+**Fix**: Remove wait_template, use simple condition check + immediate service call (v1.3/v1.4 fix)
+```yaml
+# BAD (v1.2/v1.3 bug):
+- wait_template: "{{ states(lux_sensor) | float < threshold }}"
+  timeout: { seconds: 120 }
+  continue_on_timeout: false  # ← Exits if lux fluctuates!
+- service: light.turn_on  # Never reached if timeout
+
+# GOOD (v1.3/v1.4 fix):
+- service: light.turn_on  # Immediate, no wait
+  target: !input lights
+  data:
+    brightness_pct: "{{ brightness }}"
+```
 
 ### Issue: Transition values causing errors
 **Cause**: Passing string instead of number
