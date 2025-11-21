@@ -12,7 +12,7 @@ This is a Home Assistant blueprint repository containing **5 production blueprin
 /blueprints/                              # Production blueprint files
   circadian_rhythm_lighting.yaml          # Original fixed-time circadian (v1.0)
   circadian_rhythm_lighting_sun_aware.yaml # Sun-tracking circadian (v2.0)
-  intelligent_living_room_mmwave_lux_aware.yaml # mmWave + lux-aware (v1.2)
+  intelligent_living_room_mmwave_lux_aware.yaml # mmWave + lux-aware (v1.5)
   adjacent_zone_motion_circadian_lighting.yaml # Adjacent zone motion (v1.1)
   child_night_light.yaml                  # Child-friendly night light (v1.0)
 
@@ -56,7 +56,7 @@ README.md                                 # Main repository documentation
 
 ### 3. Intelligent Living Room Lighting (mmWave + Lux Aware)
 - **File**: `intelligent_living_room_mmwave_lux_aware.yaml`
-- **Version**: 1.4 (CRITICAL - added lux numeric_state trigger for proper monitoring)
+- **Version**: 1.5 (CRITICAL - fixed string vs boolean bug that prevented automation from executing)
 - **Color Range**: 1800K-5500K (warmest baseline in the system)
 - **Special Features**:
   - Aqara FP2 mmWave presence detection
@@ -64,7 +64,13 @@ README.md                                 # Main repository documentation
   - Dynamic brightness scaling (100% @ ≤50 lux → 40% @ 150 lux)
   - Scene cycling system (3 Philips Hue scenes via input_number helper)
   - Optimized turn-off timing (day: 15/20/25 min, night: 5/10/15 min)
-- **CRITICAL BUG FIX (v1.4)**: Added lux numeric_state trigger for proper lux monitoring
+- **CRITICAL BUG FIX (v1.5)**: Fixed string vs boolean bug in override_active and scene_is_active variables
+  - v1.4 bug: Variables returned STRING "false" instead of BOOLEAN false
+  - Impact: `not "false"` = FALSE (any string is truthy in Jinja2!)
+  - Branch 4 condition `{{ not scene_is_active }}` always failed, blocking ALL automation actions
+  - v1.5 fix: Simplified templates using AND chain syntax to return actual booleans
+  - Result: Automation now executes actions properly when presence detected
+- **Previous Fix (v1.4)**: Added lux numeric_state trigger for proper lux monitoring
   - v1.3 bug: Only checked lux in 60-second loop, could miss rapid changes or have delays
   - v1.4 fix: Added trigger that fires when lux > 150 (OFF threshold)
   - Result: Lights turn off immediately when room becomes bright (sunrise, curtains opened)
@@ -324,6 +330,43 @@ trigger:
       target: !input lights
       data:
         transition: 5
+```
+
+### Issue: Automation not executing any actions despite presence
+**Cause**: Variables returning STRING "false" instead of BOOLEAN false (v1.4 bug)
+**Fix**: Simplify templates to return actual boolean values using AND chain syntax (v1.5 fix)
+```yaml
+# BAD (v1.4 bug):
+override_active: >
+  {% if override_system_enabled and override_trigger_entity %}
+    {{ is_state(override_trigger_entity, 'on') }}
+  {% else %}
+    false  # ← Returns STRING "false" not boolean!
+  {% endif %}
+
+scene_is_active: >
+  {% if scene_cycling_system_enabled and scene_tracker_entity %}
+    {{ (states(scene_tracker_entity) | int(0)) > 0 }}
+  {% else %}
+    false  # ← Returns STRING "false" not boolean!
+  {% endif %}
+
+# Problem: In conditions
+- condition: template
+  value_template: "{{ not scene_is_active }}"
+  # not "false" = FALSE (any non-empty string is truthy in Jinja2!)
+  # Result: Condition ALWAYS fails, blocking all actions
+
+# GOOD (v1.5 fix):
+override_active: >
+  {{ override_system_enabled and override_trigger_entity and is_state(override_trigger_entity, 'on') }}
+  # Returns actual BOOLEAN True/False
+
+scene_is_active: >
+  {{ scene_cycling_system_enabled and scene_tracker_entity and (states(scene_tracker_entity) | int(0)) > 0 }}
+  # Returns actual BOOLEAN True/False
+
+# Result: not false = TRUE (correct boolean logic!)
 ```
 
 ### Issue: Transition values causing errors
