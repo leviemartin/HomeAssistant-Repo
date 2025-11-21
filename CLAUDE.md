@@ -76,7 +76,7 @@ README.md                                 # Main repository documentation
 
 ### 4. Adjacent Zone Motion Sensor
 - **File**: `adjacent_zone_motion_circadian_lighting.yaml`
-- **Version**: 1.5 (CRITICAL - added lux numeric_state trigger for proper monitoring)
+- **Version**: 1.6 (CRITICAL - added lux numeric_state trigger, fixed v1.5 import error)
 - **Color Range**: 1800K-5500K (IDENTICAL to living room for color consistency)
 - **Design Philosophy**: **100% color consistency with living room blueprint**
   - Extracted EXACT same sun elevation → Kelvin formula
@@ -87,9 +87,10 @@ README.md                                 # Main repository documentation
   - Hardcoded Quick timing (5/10/15 min = 15 min total) - optimized for hallways/bathrooms
   - Configurable brightness curve (v1.1 update)
   - PIR motion sensor compatible (Philips Hue, Aqara P1)
-- **CRITICAL BUG FIX (v1.5)**: Added lux numeric_state trigger for proper lux monitoring
+- **CRITICAL BUG FIX (v1.6)**: Added lux numeric_state trigger for proper lux monitoring
   - v1.4 bug: Only checked lux at motion trigger time, never monitored during wait periods
-  - v1.5 fix: Added trigger that fires when lux > 150 (OFF threshold)
+  - v1.5 bug: Import error - referenced non-existent `!input lux_turn_off_threshold`
+  - v1.6 fix: Uses hardcoded value `above: 150` (matches hardcoded variable lux_off_threshold)
   - Result: Lights turn off immediately when room becomes bright (sunrise, curtains opened)
   - Branch 2 handles lux_exceeded trigger, respects override settings
 - **Previous Fix (v1.4)**: Removed debounce wait_template that could block turn-on

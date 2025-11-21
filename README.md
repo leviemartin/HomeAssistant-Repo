@@ -32,8 +32,8 @@ https://raw.githubusercontent.com/leviemartin/HomeAssistant-Repo/main/blueprints
 
 [📖 Quick Start](blueprints/INTELLIGENT_LIVING_ROOM_QUICK_START.md) | [📘 Complete Setup Guide](blueprints/INTELLIGENT_LIVING_ROOM_SETUP_GUIDE.md) | [🔬 Anti-Flicker Technical Guide](blueprints/ANTI_FLICKER_TECHNICAL_GUIDE.md) | [📡 FP2 Features Reference](blueprints/FP2_FEATURES_REFERENCE.md)
 
-### 4. Adjacent Zone Motion Sensor with Circadian Lighting ⭐ v1.5
-Motion-activated lighting for hallways, bathrooms, and stairs with GUARANTEED color consistency to the living room blueprint. Uses identical circadian formulas (1800K-5500K) with hardcoded Quick timing (5/10/15 min = 15 min total) optimized for quick-transition spaces. **CRITICAL FIX v1.5:** Adds lux numeric_state trigger so lights turn off when room becomes bright! **Finally works reliably in sunny conditions!**
+### 4. Adjacent Zone Motion Sensor with Circadian Lighting ⭐ v1.6
+Motion-activated lighting for hallways, bathrooms, and stairs with GUARANTEED color consistency to the living room blueprint. Uses identical circadian formulas (1800K-5500K) with hardcoded Quick timing (5/10/15 min = 15 min total) optimized for quick-transition spaces. **CRITICAL FIX v1.6:** Adds lux numeric_state trigger so lights turn off when room becomes bright! **Finally works reliably in sunny conditions!**
 
 **Import URL:**
 ```
@@ -304,7 +304,7 @@ Result: No flicker, instant response, reliable operation.
 
 ---
 
-## Adjacent Zone Motion Sensor with Circadian Lighting ⭐ v1.5
+## Adjacent Zone Motion Sensor with Circadian Lighting ⭐ v1.6
 
 ### Key Features
 
@@ -408,9 +408,10 @@ override_entity: input_boolean.hallway_override
 
 **If motion detected during any stage:** Automation restarts from T+0 (lights back to 100%)
 
-### Recent Enhancements (v1.5) ⭐ LUX MONITORING FIXED
+### Recent Enhancements (v1.6) ⭐ LUX MONITORING FIXED
 
-- ✅ **CRITICAL FIX: Lux Numeric State Trigger** - Automation now fires when lux exceeds threshold
+- ✅ **CRITICAL FIX: Lux Numeric State Trigger** - Automation now fires when lux exceeds threshold (150 lux hardcoded)
+- ✅ **Import Error Fixed** - v1.5 had bug referencing non-existent input, v1.6 uses hardcoded value
 - ✅ **Immediate Turn-Off When Bright** - Lights turn off as soon as room becomes bright (sunrise, curtains)
 - ✅ **No More Guessing** - v1.4 only checked lux at motion trigger, never monitored afterward
 - ✅ **Respects Override** - Won't turn off if manual override is active
