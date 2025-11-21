@@ -12,7 +12,7 @@ This is a Home Assistant blueprint repository containing **5 production blueprin
 /blueprints/                              # Production blueprint files
   circadian_rhythm_lighting.yaml          # Original fixed-time circadian (v1.0)
   circadian_rhythm_lighting_sun_aware.yaml # Sun-tracking circadian (v2.0)
-  intelligent_living_room_mmwave_lux_aware.yaml # mmWave + lux-aware (v1.5)
+  intelligent_living_room_mmwave_lux_aware.yaml # mmWave + lux-aware (v1.6)
   adjacent_zone_motion_circadian_lighting.yaml # Adjacent zone motion (v1.1)
   child_night_light.yaml                  # Child-friendly night light (v1.0)
 
@@ -56,7 +56,7 @@ README.md                                 # Main repository documentation
 
 ### 3. Intelligent Living Room Lighting (mmWave + Lux Aware)
 - **File**: `intelligent_living_room_mmwave_lux_aware.yaml`
-- **Version**: 1.5 (CRITICAL - fixed string vs boolean bug that prevented automation from executing)
+- **Version**: 1.6 (NEW FEATURE - added lux_dropped trigger for complete bidirectional lux monitoring)
 - **Color Range**: 1800K-5500K (warmest baseline in the system)
 - **Special Features**:
   - Aqara FP2 mmWave presence detection
@@ -64,13 +64,20 @@ README.md                                 # Main repository documentation
   - Dynamic brightness scaling (100% @ ≤50 lux → 40% @ 150 lux)
   - Scene cycling system (3 Philips Hue scenes via input_number helper)
   - Optimized turn-off timing (day: 15/20/25 min, night: 5/10/15 min)
-- **CRITICAL BUG FIX (v1.5)**: Fixed string vs boolean bug in override_active and scene_is_active variables
+- **NEW FEATURE (v1.6)**: Added lux_dropped trigger for complete lux monitoring
+  - v1.5 had only lux_exceeded trigger (turn OFF when bright)
+  - v1.6 adds lux_dropped trigger (turn ON when dark)
+  - Trigger 6: `numeric_state below lux_turn_on_threshold`
+  - Branch 2C handles lux_dropped, checks presence, respects scenes
+  - Result: Lights turn ON immediately when room darkens during presence (sunset, curtains closed)
+  - Safety: Only activates if presence detected (won't light empty room)
+- **Previous Fix (v1.5)**: Fixed string vs boolean bug in override_active and scene_is_active variables
   - v1.4 bug: Variables returned STRING "false" instead of BOOLEAN false
   - Impact: `not "false"` = FALSE (any string is truthy in Jinja2!)
   - Branch 4 condition `{{ not scene_is_active }}` always failed, blocking ALL automation actions
   - v1.5 fix: Simplified templates using AND chain syntax to return actual booleans
   - Result: Automation now executes actions properly when presence detected
-- **Previous Fix (v1.4)**: Added lux numeric_state trigger for proper lux monitoring
+- **Previous Fix (v1.4)**: Added lux_exceeded trigger for proper lux monitoring
   - v1.3 bug: Only checked lux in 60-second loop, could miss rapid changes or have delays
   - v1.4 fix: Added trigger that fires when lux > 150 (OFF threshold)
   - Result: Lights turn off immediately when room becomes bright (sunrise, curtains opened)
