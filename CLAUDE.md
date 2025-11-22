@@ -12,7 +12,7 @@ This is a Home Assistant blueprint repository containing **5 production blueprin
 /blueprints/                              # Production blueprint files
   circadian_rhythm_lighting.yaml          # Original fixed-time circadian (v1.0)
   circadian_rhythm_lighting_sun_aware.yaml # Sun-tracking circadian (v2.0)
-  intelligent_living_room_mmwave_lux_aware.yaml # mmWave + lux-aware (v1.7)
+  intelligent_living_room_mmwave_lux_aware.yaml # mmWave + lux-aware (v1.8)
   adjacent_zone_motion_circadian_lighting.yaml # Adjacent zone motion (v1.7)
   child_night_light.yaml                  # Child-friendly night light (v1.0)
 
@@ -56,7 +56,7 @@ README.md                                 # Main repository documentation
 
 ### 3. Intelligent Living Room Lighting (mmWave + Lux Aware)
 - **File**: `intelligent_living_room_mmwave_lux_aware.yaml`
-- **Version**: 1.7 (CRITICAL FIX - continuous monitoring loop now runs, circadian colors update every 60 seconds)
+- **Version**: 1.8 (CRITICAL FIX - lights now turn off properly when presence clears)
 - **Color Range**: 1800K-5500K (warmest baseline in the system)
 - **Special Features**:
   - Aqara FP2 mmWave presence detection
@@ -64,7 +64,15 @@ README.md                                 # Main repository documentation
   - Dynamic brightness scaling (100% @ ≤50 lux → 40% @ 150 lux)
   - Scene cycling system (3 Philips Hue scenes via input_number helper)
   - Optimized turn-off timing (day: 15/20/25 min, night: 5/10/15 min)
-- **CRITICAL FIX (v1.7)**: Fixed continuous monitoring loop not running + loop variable boolean bugs
+- **CRITICAL FIX (v1.8)**: Fixed staged turn-off not running when presence clears
+  - v1.7 bug: Condition inside repeat loop checked if presence was "on"
+  - When presence cleared to "off", condition FAILED, causing loop to error out
+  - Automation exited WITHOUT reaching staged turn-off sequence (lights stayed on forever)
+  - v1.8 fix: Removed blocking condition from inside repeat sequence
+  - Now uses ONLY the "until" condition to cleanly exit loop
+  - Result: Loop exits properly when presence clears, staged turn-off runs correctly
+  - User report fixed: "Lights just stay on when no presence detected" - SOLVED!
+- **Previous Fix (v1.7)**: Fixed continuous monitoring loop not running + loop variable boolean bugs
   - v1.6 bug: Branch 2C (lux_dropped) turned on lights then EXITED - no continuous updates
   - v1.6 bug: loop_override_active, loop_scene_is_active, time_override returned STRING "false"
   - v1.7 fix: Merged Branch 2C into Branch 3 using OR condition (presence OR lux_dropped)
@@ -220,6 +228,45 @@ action:
 - Place continuous monitoring loop AFTER initial turn-on logic
 - Always recalculate variables inside loop (don't reuse top-level variables)
 - Use AND chain syntax for boolean variables in loop scope
+- **CRITICAL**: Do NOT use conditions inside repeat sequence to check exit criteria
+- Use ONLY the "until" condition to exit the loop cleanly
+
+**Common Mistake #2: Blocking Condition Inside Loop**
+```yaml
+# BAD - Condition inside sequence blocks exit
+- repeat:
+    sequence:
+      - delay: { seconds: 60 }
+      - condition: state  # ← BLOCKS when presence clears!
+        entity_id: !input presence_sensor
+        state: "on"
+      - [update lights]
+    until:
+      - condition: state
+        entity_id: !input presence_sensor
+        state: "off"
+# Problem: When presence clears, inner condition FAILS, loop errors out
+# Never reaches the "until" check or the staged turn-off code after loop
+
+# GOOD - No condition inside sequence
+- repeat:
+    sequence:
+      - delay: { seconds: 60 }
+      - [recalculate variables]
+      - [update lights]
+    until:
+      - condition: state
+        entity_id: !input presence_sensor
+        state: "off"
+# Result: Loop completes iteration, checks "until", exits cleanly
+```
+
+**Why This Matters:**
+- v1.7 bug: Condition inside loop prevented staged turn-off from running
+- When presence cleared, condition failed, automation exited early
+- Lights stayed on forever (no turn-off sequence ran)
+- v1.8 fix: Removed condition from inside sequence
+- Result: Loop exits cleanly via "until", staged turn-off runs properly
 
 ### Optional Sensor Pattern (Adjacent Zone v1.7)
 
