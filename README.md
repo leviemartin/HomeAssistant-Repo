@@ -22,8 +22,8 @@ https://raw.githubusercontent.com/leviemartin/HomeAssistant-Repo/main/blueprints
 
 [📖 Quick Start Guide](blueprints/QUICK_START.md) | [🔬 Scientific Details](blueprints/SUN_AWARE_UPGRADE_GUIDE.md) | [⚖️ Feature Comparison](blueprints/FEATURE_COMPARISON.md)
 
-### 3. Intelligent Living Room Lighting (mmWave + Lux Aware) ⭐ v1.7
-Advanced living room automation with Aqara FP2 mmWave presence detection, natural light awareness, and anti-flicker protection. Features sun-aware circadian rhythm integration, dynamic brightness scaling, optimized turn-off timing (day: 15/20/25 min, night: 5/10/15 min), scene cycling (cycle through 3 Philips Hue scenes). **CRITICAL FIX v1.7:** Fixed continuous monitoring loop not running - circadian colors and brightness now update every 60 seconds! **v1.6:** Added lux_dropped trigger. **v1.5:** Fixed boolean bug.
+### 3. Intelligent Living Room Lighting (mmWave + Lux Aware) ⭐ v1.8
+Advanced living room automation with Aqara FP2 mmWave presence detection, natural light awareness, and anti-flicker protection. Features sun-aware circadian rhythm integration, dynamic brightness scaling, optimized turn-off timing (day: 15/20/25 min, night: 5/10/15 min), scene cycling (cycle through 3 Philips Hue scenes). **CRITICAL FIX v1.8:** Lights now turn off properly when presence clears! Removed blocking condition that prevented staged turn-off from running. **v1.7:** Fixed continuous loop. **v1.6:** Added lux_dropped trigger.
 
 **Import URL:**
 ```
@@ -265,7 +265,15 @@ Result: No flicker, instant response, reliable operation.
 - [🔬 Anti-Flicker Technical Guide](blueprints/ANTI_FLICKER_TECHNICAL_GUIDE.md) - Deep dive into hysteresis logic
 - [📡 FP2 Features Reference](blueprints/FP2_FEATURES_REFERENCE.md) - Aqara FP2 capabilities
 
-### Recent Enhancements (v1.7) ⭐ CONTINUOUS UPDATES FIXED
+### Recent Enhancements (v1.8) ⭐ TURN-OFF NOW WORKS
+
+- ✅ **CRITICAL FIX: Lights Turn Off When Presence Clears** - Removed blocking condition in repeat loop
+- ✅ **Staged Turn-Off Sequence Runs** - Properly dims to 40% → 20% → OFF
+- ✅ **User Report Fixed** - "Lights just stay on when no presence detected" - SOLVED!
+- ✅ **Root Cause** - Condition inside loop errored out instead of cleanly exiting to turn-off code
+- ✅ **The Fix** - Use only "until" condition to exit loop, removed internal presence check
+
+### Previous Enhancements (v1.7)
 
 - ✅ **CRITICAL FIX: Continuous Loop Now Runs** - Merged lux_dropped trigger into Branch 3
 - ✅ **Circadian Colors Update Every 60 Seconds** - Loop wasn't running in v1.6, now fixed!
