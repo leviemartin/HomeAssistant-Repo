@@ -72,6 +72,8 @@ README.md                                 # Main repository documentation
   - Result: Continuous loop now runs for both presence_detected and lux_dropped triggers
   - Result: Circadian colors update every 60 seconds, brightness scales with lux
   - User report fixed: "Stuck in Option 6, no circadian/brightness changes" - SOLVED!
+  - **CRITICAL**: Branch 3 handles BOTH presence_detected AND lux_dropped triggers via OR condition
+  - **CRITICAL**: Continuous monitoring loop MUST be inside Branch 3 to run for all entry points
 - **Previous Feature (v1.6)**: Added lux_dropped trigger for complete lux monitoring
   - v1.5 had only lux_exceeded trigger (turn OFF when bright)
   - v1.6 adds lux_dropped trigger (turn ON when dark)
@@ -136,6 +138,150 @@ README.md                                 # Main repository documentation
   - RGB color conversion for non-color_temp lights
 
 ## Critical Technical Patterns
+
+### Continuous Monitoring Loop Architecture (Living Room Blueprint)
+
+**CRITICAL PATTERN**: The continuous monitoring loop MUST be accessible from ALL entry points that turn on lights.
+
+**Architecture:**
+```yaml
+action:
+  - choose:
+      # BRANCH 1: Override toggle (no loop needed)
+
+      # BRANCH 2B: lux_exceeded (turn OFF only, no loop needed)
+
+      # BRANCH 3: MAIN ENTRY POINT - Handles multiple triggers
+      - conditions:
+          - or:  # ← CRITICAL: OR condition for multiple entry points
+              - condition: trigger
+                id: presence_detected
+              - condition: trigger
+                id: lux_dropped
+        sequence:
+          # Turn on lights (with lux/override checks)
+          - choose: [...]
+
+          # === CONTINUOUS MONITORING LOOP ===
+          - repeat:
+              sequence:
+                - delay: { seconds: 60 }
+                - condition: state
+                  entity_id: !input presence_sensor
+                  state: "on"
+
+                # CRITICAL: Recalculate ALL dynamic variables
+                - variables:
+                    loop_current_lux: "{{ states(lux_sensor) }}"
+                    loop_sun_elevation: "{{ state_attr('sun.sun', 'elevation') }}"
+                    loop_color_temp_kelvin: "{{ calculate_circadian() }}"
+                    loop_calculated_brightness: "{{ calculate_brightness() }}"
+                    # MUST use AND chain for booleans!
+                    loop_override_active: "{{ enabled and entity and is_state(...) }}"
+                    loop_scene_is_active: "{{ enabled and entity and (states(...) > 0) }}"
+
+                # Update lights with fresh values
+                - choose:
+                    - conditions: "{{ loop_scene_is_active }}"
+                      sequence: [skip update]
+                    - conditions: "{{ loop_override_active or (loop_current_lux < threshold) }}"
+                      sequence:
+                        - service: light.turn_on
+                          data:
+                            brightness_pct: "{{ loop_calculated_brightness }}"
+                            color_temp: "{{ loop_color_temp_mireds }}"
+```
+
+**Why This Matters:**
+- v1.6 bug: Branch 2C (lux_dropped) turned on lights then EXITED - no loop ran
+- v1.7 fix: Merged Branch 2C into Branch 3 using OR condition
+- Result: BOTH presence_detected AND lux_dropped trigger the continuous loop
+- Circadian colors and brightness now update every 60 seconds for ALL entry points
+
+**Common Mistake:**
+```yaml
+# BAD - Each trigger has separate branch
+- conditions:
+    - condition: trigger
+      id: presence_detected
+  sequence:
+    - [turn on lights]
+    - repeat: [continuous loop]  # ← Loop runs for presence
+
+- conditions:
+    - condition: trigger
+      id: lux_dropped
+  sequence:
+    - [turn on lights]  # ← Loop does NOT run for lux_dropped!
+```
+
+**Best Practice:**
+- Use OR condition to handle multiple triggers in ONE branch
+- Place continuous monitoring loop AFTER initial turn-on logic
+- Always recalculate variables inside loop (don't reuse top-level variables)
+- Use AND chain syntax for boolean variables in loop scope
+
+### Optional Sensor Pattern (Adjacent Zone v1.7)
+
+**Use Case**: Making sensors optional for different room types (e.g., windowless bathrooms don't need lux sensors).
+
+**Pattern:**
+```yaml
+# INPUT - Make sensor optional with default: {}
+inputs:
+  lux_sensor:
+    name: Lux Sensor (Optional)
+    default: {}
+    selector:
+      entity:
+        filter:
+          - domain: sensor
+            device_class: illuminance
+
+# VARIABLES - Check if sensor is configured
+variables:
+  lux_sensor_entity: !input lux_sensor
+
+  # Boolean check for sensor availability
+  lux_sensor_enabled: >
+    {{ lux_sensor_entity not in [none, '', 'unavailable', 'unknown'] and lux_sensor_entity | length > 0 }}
+
+  # Conditional sensor reading
+  current_lux: >
+    {% if lux_sensor_enabled %}
+      {{ states(lux_sensor_entity) | float(0) }}
+    {% else %}
+      0
+    {% endif %}
+
+# TRIGGERS - Cannot conditionally include triggers in YAML
+# Solution: Remove lux-based triggers, handle in conditions instead
+trigger:
+  - platform: state
+    entity_id: !input motion_sensor
+    to: "on"
+  # NOTE: No lux trigger when sensor is optional
+
+# ACTIONS - Use conditional logic
+action:
+  - choose:
+      # Turn on lights if: override OR no lux sensor OR lux below threshold
+      - conditions:
+          - condition: template
+            value_template: "{{ not lux_sensor_enabled or current_lux < lux_on_threshold }}"
+        sequence:
+          - service: light.turn_on
+```
+
+**Why This Works:**
+- `default: {}` makes input optional (won't error if empty)
+- `lux_sensor_enabled` safely checks if sensor exists
+- Conditional logic: `not lux_sensor_enabled or current_lux < threshold`
+- Without sensor: Motion ALWAYS turns on lights
+- With sensor: Motion turns on lights only if dark enough
+
+**Applied In:**
+- Adjacent Zone v1.7 (optional lux for windowless bathrooms)
 
 ### Color Temperature Conversion
 ```yaml
@@ -355,10 +501,10 @@ trigger:
 ```
 
 ### Issue: Automation not executing any actions despite presence
-**Cause**: Variables returning STRING "false" instead of BOOLEAN false (v1.4 bug)
-**Fix**: Simplify templates to return actual boolean values using AND chain syntax (v1.5 fix)
+**Cause**: Variables returning STRING "false" instead of BOOLEAN false (v1.4/v1.6 bug)
+**Fix**: Simplify templates to return actual boolean values using AND chain syntax (v1.5/v1.7 fix)
 ```yaml
-# BAD (v1.4 bug):
+# BAD (v1.4/v1.6 bug):
 override_active: >
   {% if override_system_enabled and override_trigger_entity %}
     {{ is_state(override_trigger_entity, 'on') }}
@@ -379,7 +525,7 @@ scene_is_active: >
   # not "false" = FALSE (any non-empty string is truthy in Jinja2!)
   # Result: Condition ALWAYS fails, blocking all actions
 
-# GOOD (v1.5 fix):
+# GOOD (v1.5/v1.7 fix):
 override_active: >
   {{ override_system_enabled and override_trigger_entity and is_state(override_trigger_entity, 'on') }}
   # Returns actual BOOLEAN True/False
@@ -390,6 +536,11 @@ scene_is_active: >
 
 # Result: not false = TRUE (correct boolean logic!)
 ```
+
+**CRITICAL NOTE**: This bug affected BOTH top-level variables AND loop variables:
+- v1.5 fixed top-level variables (override_active, scene_is_active)
+- v1.7 fixed loop variables (loop_override_active, loop_scene_is_active, time_override)
+- **Always check BOTH scopes** when fixing boolean bugs!
 
 ### Issue: Transition values causing errors
 **Cause**: Passing string instead of number
