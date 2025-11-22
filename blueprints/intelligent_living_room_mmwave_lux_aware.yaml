@@ -1,16 +1,16 @@
 blueprint:
-  name: Intelligent Living Room - mmWave + Lux-Aware v1.7
+  name: Intelligent Living Room - mmWave + Lux-Aware v1.8
   description: >
     Professional-grade lighting automation combining mmWave presence detection,
     lux-aware hysteresis anti-flicker logic, staged turn-off sequences, dynamic
     brightness adjustment, sun-aware circadian rhythm, and Philips Hue scene cycling.
 
 
-    This is v1.7 - CRITICAL FIX: Fixed continuous monitoring loop not running after
-    lux_dropped trigger. Also fixed loop variables (loop_override_active, loop_scene_is_active,
-    time_override) returning strings instead of booleans. Merged Branch 2C into Branch 3
-    so lux_dropped trigger includes continuous circadian updates. NOW WORKING: Circadian
-    colors and brightness update every 60 seconds! v1.6 added lux_dropped, v1.5 fixed booleans.
+    This is v1.8 - CRITICAL FIX: Removed blocking condition inside repeat loop that prevented
+    staged turn-off from running. The condition checked if presence was "on" but when presence
+    cleared to "off", it caused the loop to error out instead of cleanly exiting to the
+    staged turn-off sequence. Now uses only the "until" condition which properly exits the loop.
+    RESULT: Lights now turn off properly when presence clears! v1.7 fixed loop/booleans.
 
 
     KEY FEATURES:
@@ -1213,11 +1213,6 @@ action:
                 # Wait for circadian update interval
                 - delay:
                     seconds: "{{ circadian_update_sec }}"
-
-                # Check if lights are still on and presence still detected
-                - condition: state
-                  entity_id: !input presence_sensor
-                  state: "on"
 
                 # === RECALCULATE DYNAMIC VALUES FOR THIS ITERATION ===
                 # CRITICAL: Variables from top-level are stale - must recalculate here!
