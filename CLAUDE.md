@@ -330,6 +330,81 @@ action:
 **Applied In:**
 - Adjacent Zone v1.7 (optional lux for windowless bathrooms)
 
+**Common Mistake #3: Triggers Interrupting Turn-Off with mode:restart**
+
+**The Bug (Living Room v1.8):**
+```yaml
+mode: restart  # Any new trigger CANCELS currently running automation
+
+trigger:
+  - platform: numeric_state
+    entity_id: !input lux_sensor
+    below: !input lux_turn_on_threshold
+    id: lux_dropped  # Fires when lux drops below threshold
+
+action:
+  - choose:
+      # BRANCH 3: Presence OR lux_dropped
+      - conditions:
+          - or:
+              - condition: trigger
+                id: presence_detected
+              - condition: trigger
+                id: lux_dropped
+          # BUG: No presence check! lux_dropped can fire even when presence is "off"
+        sequence:
+          # ... turn on lights, run continuous loop ...
+          # When presence clears, loop exits
+          # Start staged turn-off (5 minute delay)
+          - delay: { seconds: 300 }  # ← During this delay...
+          # lux fluctuates and drops below threshold
+          # lux_dropped triggers again!
+          # mode:restart CANCELS this automation
+          # Turn-off sequence never completes!
+          - service: light.turn_off  # ← Never reached!
+```
+
+**The Problem:**
+1. Presence clears → loop exits → staged turn-off starts
+2. During the 5-10 minute delay, lux sensor fluctuates (clouds, curtains, etc.)
+3. Lux drops below ON threshold → `lux_dropped` trigger fires
+4. With `mode: restart`, automation RESTARTS and CANCELS the turn-off
+5. Branch 3 checks conditions → presence is "off" → branch skips
+6. Automation ends, no turn-off sequence runs
+7. Lights stay on forever!
+8. If lux keeps fluctuating, turn-off is interrupted repeatedly
+
+**The Fix (Living Room v1.9):**
+```yaml
+action:
+  - choose:
+      # BRANCH 3: Presence OR lux_dropped (with presence guard)
+      - conditions:
+          - or:
+              - condition: trigger
+                id: presence_detected
+              - condition: trigger
+                id: lux_dropped
+          # FIX: Add presence check to prevent interruption!
+          - condition: state
+            entity_id: !input presence_sensor
+            state: "on"
+        sequence:
+          # Now lux_dropped only runs if presence is actually detected
+          # When presence is "off", lux_dropped won't restart automation
+          # Turn-off sequence can complete without interruption
+```
+
+**Why This Matters:**
+- With `mode: restart`, ANY trigger will cancel the running automation
+- Numeric state triggers (lux, temperature, etc.) can fire frequently due to sensor noise
+- Time pattern triggers (circadian updates) fire on schedule regardless of state
+- Must add guards to prevent unwanted triggers during critical sequences like turn-off
+- Always check if the triggering condition is still valid (e.g., presence "on") before running branch
+
+**Key Lesson:**
+When using `mode: restart`, carefully review ALL triggers and their corresponding branch conditions. Ask: "Should this branch run when presence is off or lights are turning off?" If not, add appropriate state checks.
+
 ### Color Temperature Conversion
 ```yaml
 # Kelvin → Mireds (for Philips Hue color_temp attribute)

@@ -1,16 +1,17 @@
 blueprint:
-  name: Intelligent Living Room - mmWave + Lux-Aware v1.8
+  name: Intelligent Living Room - mmWave + Lux-Aware v1.9
   description: >
     Professional-grade lighting automation combining mmWave presence detection,
     lux-aware hysteresis anti-flicker logic, staged turn-off sequences, dynamic
     brightness adjustment, sun-aware circadian rhythm, and Philips Hue scene cycling.
 
 
-    This is v1.8 - CRITICAL FIX: Removed blocking condition inside repeat loop that prevented
-    staged turn-off from running. The condition checked if presence was "on" but when presence
-    cleared to "off", it caused the loop to error out instead of cleanly exiting to the
-    staged turn-off sequence. Now uses only the "until" condition which properly exits the loop.
-    RESULT: Lights now turn off properly when presence clears! v1.7 fixed loop/booleans.
+    This is v1.9 - CRITICAL FIX: Added presence check to Branch 3 to prevent lux_dropped trigger
+    from interrupting staged turn-off. The issue: with mode:restart, when lux fluctuates during
+    turn-off (drops below ON threshold), automation restarts and cancels the turn-off sequence,
+    causing lights to never turn off. Fix: Branch 3 now requires presence "on" before running,
+    so lux_dropped won't restart automation when room is unoccupied. v1.8 removed blocking condition,
+    v1.7 fixed loop/booleans.
 
 
     KEY FEATURES:
@@ -1155,12 +1156,17 @@ action:
       # ======================================================================
       # This branch handles BOTH presence detection AND lux_dropped triggers
       # Both cases need the continuous monitoring loop for circadian updates
+      # CRITICAL: Only run if presence is actually "on" to prevent lux_dropped
+      # from restarting automation during staged turn-off sequence
       - conditions:
           - or:
               - condition: trigger
                 id: presence_detected
               - condition: trigger
                 id: lux_dropped
+          - condition: state
+            entity_id: !input presence_sensor
+            state: "on"
         sequence:
           # === LUX HYSTERESIS CHECK (ANTI-FLICKER LOGIC) ===
           # Only turn on if:
