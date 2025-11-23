@@ -56,7 +56,7 @@ README.md                                 # Main repository documentation
 
 ### 3. Intelligent Living Room Lighting (mmWave + Lux Aware)
 - **File**: `intelligent_living_room_mmwave_lux_aware.yaml`
-- **Version**: 1.8 (CRITICAL FIX - lights now turn off properly when presence clears)
+- **Version**: 1.9 (CRITICAL FIX - lux_dropped no longer interrupts turn-off sequence)
 - **Color Range**: 1800K-5500K (warmest baseline in the system)
 - **Special Features**:
   - Aqara FP2 mmWave presence detection
@@ -64,14 +64,23 @@ README.md                                 # Main repository documentation
   - Dynamic brightness scaling (100% @ ≤50 lux → 40% @ 150 lux)
   - Scene cycling system (3 Philips Hue scenes via input_number helper)
   - Optimized turn-off timing (day: 15/20/25 min, night: 5/10/15 min)
-- **CRITICAL FIX (v1.8)**: Fixed staged turn-off not running when presence clears
+- **CRITICAL FIX (v1.9)**: Added presence guard to prevent lux_dropped from interrupting turn-off
+  - v1.8 bug: lux_dropped trigger could fire during turn-off delay (lux fluctuations from clouds/curtains)
+  - With mode:restart, this CANCELLED the running automation and restarted it
+  - Branch 3 conditions failed (presence was "off"), automation ended without turn-off
+  - Lux fluctuations repeatedly interrupted turn-off → lights stayed on forever
+  - v1.9 fix: Added presence state check to Branch 3 conditions (lines 1166-1168)
+  - Now lux_dropped only runs Branch 3 if presence is actually "on"
+  - When presence is "off", lux_dropped won't restart automation or interrupt turn-off
+  - Result: Turn-off sequence completes successfully even with lux sensor noise
+  - User report fixed: "the fix did not work. the living room automation is still not triggering the turn off process" - SOLVED!
+- **Previous Fix (v1.8)**: Fixed staged turn-off not running when presence clears
   - v1.7 bug: Condition inside repeat loop checked if presence was "on"
   - When presence cleared to "off", condition FAILED, causing loop to error out
   - Automation exited WITHOUT reaching staged turn-off sequence (lights stayed on forever)
   - v1.8 fix: Removed blocking condition from inside repeat sequence
   - Now uses ONLY the "until" condition to cleanly exit loop
   - Result: Loop exits properly when presence clears, staged turn-off runs correctly
-  - User report fixed: "Lights just stay on when no presence detected" - SOLVED!
 - **Previous Fix (v1.7)**: Fixed continuous monitoring loop not running + loop variable boolean bugs
   - v1.6 bug: Branch 2C (lux_dropped) turned on lights then EXITED - no continuous updates
   - v1.6 bug: loop_override_active, loop_scene_is_active, time_override returned STRING "false"
