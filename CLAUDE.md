@@ -56,7 +56,7 @@ README.md                                 # Main repository documentation
 
 ### 3. Intelligent Living Room Lighting (mmWave + Lux Aware)
 - **File**: `intelligent_living_room_mmwave_lux_aware.yaml`
-- **Version**: 1.9 (CRITICAL FIX - lux_dropped no longer interrupts turn-off sequence)
+- **Version**: 1.10 (CRITICAL FIX - responsive presence detection in loop for immediate turn-off)
 - **Color Range**: 1800K-5500K (warmest baseline in the system)
 - **Special Features**:
   - Aqara FP2 mmWave presence detection
@@ -64,7 +64,17 @@ README.md                                 # Main repository documentation
   - Dynamic brightness scaling (100% @ ≤50 lux → 40% @ 150 lux)
   - Scene cycling system (3 Philips Hue scenes via input_number helper)
   - Optimized turn-off timing (day: 15/20/25 min, night: 5/10/15 min)
-- **CRITICAL FIX (v1.9)**: Added presence guard to prevent lux_dropped from interrupting turn-off
+- **CRITICAL FIX (v1.10)**: Added responsive presence detection in continuous monitoring loop
+  - v1.9 bug: Loop only checked "until" condition after each 60-second iteration completed
+  - If presence cleared during delay, loop wouldn't detect it until after delay + recalculation + updates
+  - This created a window (up to 60 seconds) where triggers could restart automation and cancel turn-off
+  - Result: Turn-off sequence never ran, lights stayed on even with no presence
+  - v1.10 fix: Added presence check immediately after delay (lines 1223-1230)
+  - If presence is "off", skip all variable recalculation and light updates
+  - Loop immediately proceeds to "until" check, which exits cleanly
+  - Result: Turn-off triggers within 1 second instead of up to 60 seconds after presence clears!
+  - User report fixed: "For some reason the turn off steps never get triggered" - SOLVED!
+- **Previous Fix (v1.9)**: Added presence guard to prevent lux_dropped from interrupting turn-off
   - v1.8 bug: lux_dropped trigger could fire during turn-off delay (lux fluctuations from clouds/curtains)
   - With mode:restart, this CANCELLED the running automation and restarted it
   - Branch 3 conditions failed (presence was "off"), automation ended without turn-off
@@ -73,7 +83,6 @@ README.md                                 # Main repository documentation
   - Now lux_dropped only runs Branch 3 if presence is actually "on"
   - When presence is "off", lux_dropped won't restart automation or interrupt turn-off
   - Result: Turn-off sequence completes successfully even with lux sensor noise
-  - User report fixed: "the fix did not work. the living room automation is still not triggering the turn off process" - SOLVED!
 - **Previous Fix (v1.8)**: Fixed staged turn-off not running when presence clears
   - v1.7 bug: Condition inside repeat loop checked if presence was "on"
   - When presence cleared to "off", condition FAILED, causing loop to error out

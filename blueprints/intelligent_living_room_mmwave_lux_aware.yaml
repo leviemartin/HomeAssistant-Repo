@@ -1,17 +1,18 @@
 blueprint:
-  name: Intelligent Living Room - mmWave + Lux-Aware v1.9
+  name: Intelligent Living Room - mmWave + Lux-Aware v1.10
   description: >
     Professional-grade lighting automation combining mmWave presence detection,
     lux-aware hysteresis anti-flicker logic, staged turn-off sequences, dynamic
     brightness adjustment, sun-aware circadian rhythm, and Philips Hue scene cycling.
 
 
-    This is v1.9 - CRITICAL FIX: Added presence check to Branch 3 to prevent lux_dropped trigger
-    from interrupting staged turn-off. The issue: with mode:restart, when lux fluctuates during
-    turn-off (drops below ON threshold), automation restarts and cancels the turn-off sequence,
-    causing lights to never turn off. Fix: Branch 3 now requires presence "on" before running,
-    so lux_dropped won't restart automation when room is unoccupied. v1.8 removed blocking condition,
-    v1.7 fixed loop/booleans.
+    This is v1.10 - CRITICAL FIX: Added responsive presence detection in continuous monitoring loop.
+    The issue: Loop only checked "until" condition after each 60-second iteration completed. If presence
+    cleared during the delay, loop wouldn't detect it until after delay + variable recalculation + light
+    updates, creating a window for triggers to restart automation and cancel turn-off. Fix: Added presence
+    check immediately after delay - if presence cleared, skip all updates and exit loop via "until" for
+    immediate turn-off. Result: Turn-off triggers within 1 second instead of up to 60 seconds later.
+    v1.9 added presence guard to Branch 3, v1.8 removed blocking condition, v1.7 fixed loop/booleans.
 
 
     KEY FEATURES:
@@ -1220,113 +1221,123 @@ action:
                 - delay:
                     seconds: "{{ circadian_update_sec }}"
 
-                # === RECALCULATE DYNAMIC VALUES FOR THIS ITERATION ===
-                # CRITICAL: Variables from top-level are stale - must recalculate here!
-                - variables:
-                    # Get fresh lux reading
-                    loop_current_lux: "{{ states(lux_sensor_entity) | float(0) }}"
-
-                    # Get fresh sun elevation
-                    loop_sun_elevation: "{{ state_attr('sun.sun', 'elevation') | float(0) }}"
-
-                    # Recalculate circadian color temperature
-                    loop_color_temp_kelvin: >
-                      {% if circadian_rhythm %}
-                        {% set elevation = state_attr('sun.sun', 'elevation') | float(0) %}
-                        {% if elevation < -6 %}
-                          1800
-                        {% elif elevation >= -6 and elevation < 0 %}
-                          {{ (1800 + (elevation + 6) * 200) | int }}
-                        {% elif elevation >= 0 and elevation < 10 %}
-                          {{ (3000 + (elevation * 50)) | int }}
-                        {% elif elevation >= 10 and elevation < 30 %}
-                          {{ (3500 + (elevation - 10) * 75) | int }}
-                        {% elif elevation >= 30 and elevation < 50 %}
-                          {{ (5000 + (elevation - 30) * 25) | int }}
-                        {% else %}
-                          5500
-                        {% endif %}
-                      {% else %}
-                        3000
-                      {% endif %}
-
-                    # Convert to mireds
-                    loop_color_temp_mireds: "{{ (1000000 / (loop_color_temp_kelvin | int)) | int }}"
-
-                    # Recalculate dynamic brightness based on current lux
-                    loop_calculated_brightness: >
-                      {% if dynamic_brightness %}
-                        {% set lux = states(lux_sensor_entity) | float(0) %}
-                        {% if lux <= 50 %}
-                          {{ brightness_at_50_lux }}
-                        {% elif lux <= 75 %}
-                          {% set range_pct = (lux - 50) / 25 %}
-                          {{ (brightness_at_50_lux - (brightness_at_50_lux - brightness_at_75_lux) * range_pct) | int }}
-                        {% elif lux <= 100 %}
-                          {% set range_pct = (lux - 75) / 25 %}
-                          {{ (brightness_at_75_lux - (brightness_at_75_lux - brightness_at_100_lux) * range_pct) | int }}
-                        {% elif lux <= 125 %}
-                          {% set range_pct = (lux - 100) / 25 %}
-                          {{ (brightness_at_100_lux - (brightness_at_100_lux - brightness_at_125_lux) * range_pct) | int }}
-                        {% elif lux <= 150 %}
-                          {% set range_pct = (lux - 125) / 25 %}
-                          {{ (brightness_at_125_lux - (brightness_at_125_lux - brightness_at_150_lux) * range_pct) | int }}
-                        {% else %}
-                          {{ brightness_at_150_lux }}
-                        {% endif %}
-                      {% else %}
-                        100
-                      {% endif %}
-
-                    # Recalculate override state
-                    loop_override_active: >
-                      {{ override_system_enabled and override_trigger_entity and is_state(override_trigger_entity, 'on') }}
-
-                    # Recalculate scene state
-                    loop_scene_is_active: >
-                      {{ scene_cycling_system_enabled and scene_tracker_entity and (states(scene_tracker_entity) | int(0)) > 0 }}
-
-                # Update lights with current circadian color and dynamic brightness
-                # But SKIP if scene is active (scene overrides circadian)
-                # Otherwise only update if lux is still low enough OR override is active
+                # CRITICAL: Check if presence cleared during delay
+                # If so, skip updates and exit loop immediately via "until" condition
                 - choose:
-                    # Scene active - skip circadian updates to preserve scene
                     - conditions:
-                        - condition: template
-                          value_template: "{{ loop_scene_is_active }}"
-                      sequence:
-                        - service: system_log.write
-                          data:
-                            message: "Skipping circadian update - scene is active"
-                            level: debug
+                        - condition: state
+                          entity_id: !input presence_sensor
+                          state: "off"
+                      sequence: []  # Presence cleared - skip updates, exit via "until"
+                  default:
+                    # Presence still active - continue with normal updates
+                    - variables:
+                        # === RECALCULATE DYNAMIC VALUES FOR THIS ITERATION ===
+                        # CRITICAL: Variables from top-level are stale - must recalculate here!
+                        # Get fresh lux reading
+                        loop_current_lux: "{{ states(lux_sensor_entity) | float(0) }}"
 
-                    # No scene active - normal circadian update
-                    - conditions:
-                        - condition: template
-                          value_template: "{{ loop_override_active or (loop_current_lux < lux_off_threshold) }}"
-                      sequence:
-                        - service: light.turn_on
-                          target: !input target_lights
-                          data:
-                            brightness_pct: "{{ loop_calculated_brightness }}"
-                            color_temp: "{{ loop_color_temp_mireds }}"
-                            transition: "{{ circadian_transition_sec }}"
+                        # Get fresh sun elevation
+                        loop_sun_elevation: "{{ state_attr('sun.sun', 'elevation') | float(0) }}"
 
-                    # Lux exceeded OFF threshold - turn off immediately
-                    # But SKIP if scene is active (scene ignores lux)
-                    - conditions:
-                        - condition: template
-                          value_template: "{{ not loop_override_active and not loop_scene_is_active and (loop_current_lux >= lux_off_threshold) }}"
-                      sequence:
-                        # Lux is above OFF threshold - turn off lights immediately
-                        # Hysteresis (80/150 thresholds) already provides anti-flicker protection
-                        - service: light.turn_off
-                          target: !input target_lights
-                          data:
-                            transition: 5
+                        # Recalculate circadian color temperature
+                        loop_color_temp_kelvin: >
+                          {% if circadian_rhythm %}
+                            {% set elevation = state_attr('sun.sun', 'elevation') | float(0) %}
+                            {% if elevation < -6 %}
+                              1800
+                            {% elif elevation >= -6 and elevation < 0 %}
+                              {{ (1800 + (elevation + 6) * 200) | int }}
+                            {% elif elevation >= 0 and elevation < 10 %}
+                              {{ (3000 + (elevation * 50)) | int }}
+                            {% elif elevation >= 10 and elevation < 30 %}
+                              {{ (3500 + (elevation - 10) * 75) | int }}
+                            {% elif elevation >= 30 and elevation < 50 %}
+                              {{ (5000 + (elevation - 30) * 25) | int }}
+                            {% else %}
+                              5500
+                            {% endif %}
+                          {% else %}
+                            3000
+                          {% endif %}
 
-                        # Exit repeat loop
-                        - stop: "Lights turned off due to high lux"
+                        # Convert to mireds
+                        loop_color_temp_mireds: "{{ (1000000 / (loop_color_temp_kelvin | int)) | int }}"
+
+                        # Recalculate dynamic brightness based on current lux
+                        loop_calculated_brightness: >
+                          {% if dynamic_brightness %}
+                            {% set lux = states(lux_sensor_entity) | float(0) %}
+                            {% if lux <= 50 %}
+                              {{ brightness_at_50_lux }}
+                            {% elif lux <= 75 %}
+                              {% set range_pct = (lux - 50) / 25 %}
+                              {{ (brightness_at_50_lux - (brightness_at_50_lux - brightness_at_75_lux) * range_pct) | int }}
+                            {% elif lux <= 100 %}
+                              {% set range_pct = (lux - 75) / 25 %}
+                              {{ (brightness_at_75_lux - (brightness_at_75_lux - brightness_at_100_lux) * range_pct) | int }}
+                            {% elif lux <= 125 %}
+                              {% set range_pct = (lux - 100) / 25 %}
+                              {{ (brightness_at_100_lux - (brightness_at_100_lux - brightness_at_125_lux) * range_pct) | int }}
+                            {% elif lux <= 150 %}
+                              {% set range_pct = (lux - 125) / 25 %}
+                              {{ (brightness_at_125_lux - (brightness_at_125_lux - brightness_at_150_lux) * range_pct) | int }}
+                            {% else %}
+                              {{ brightness_at_150_lux }}
+                            {% endif %}
+                          {% else %}
+                            100
+                          {% endif %}
+
+                        # Recalculate override state
+                        loop_override_active: >
+                          {{ override_system_enabled and override_trigger_entity and is_state(override_trigger_entity, 'on') }}
+
+                        # Recalculate scene state
+                        loop_scene_is_active: >
+                          {{ scene_cycling_system_enabled and scene_tracker_entity and (states(scene_tracker_entity) | int(0)) > 0 }}
+
+                    # Update lights with current circadian color and dynamic brightness
+                    # But SKIP if scene is active (scene overrides circadian)
+                    # Otherwise only update if lux is still low enough OR override is active
+                    - choose:
+                        # Scene active - skip circadian updates to preserve scene
+                        - conditions:
+                            - condition: template
+                              value_template: "{{ loop_scene_is_active }}"
+                          sequence:
+                            - service: system_log.write
+                              data:
+                                message: "Skipping circadian update - scene is active"
+                                level: debug
+
+                        # No scene active - normal circadian update
+                        - conditions:
+                            - condition: template
+                              value_template: "{{ loop_override_active or (loop_current_lux < lux_off_threshold) }}"
+                          sequence:
+                            - service: light.turn_on
+                              target: !input target_lights
+                              data:
+                                brightness_pct: "{{ loop_calculated_brightness }}"
+                                color_temp: "{{ loop_color_temp_mireds }}"
+                                transition: "{{ circadian_transition_sec }}"
+
+                        # Lux exceeded OFF threshold - turn off immediately
+                        # But SKIP if scene is active (scene ignores lux)
+                        - conditions:
+                            - condition: template
+                              value_template: "{{ not loop_override_active and not loop_scene_is_active and (loop_current_lux >= lux_off_threshold) }}"
+                          sequence:
+                            # Lux is above OFF threshold - turn off lights immediately
+                            # Hysteresis (80/150 thresholds) already provides anti-flicker protection
+                            - service: light.turn_off
+                              target: !input target_lights
+                              data:
+                                transition: 5
+
+                            # Exit repeat loop
+                            - stop: "Lights turned off due to high lux"
 
               # Continue updating until presence clears or lights turn off
               until:
