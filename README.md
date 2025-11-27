@@ -22,8 +22,8 @@ https://raw.githubusercontent.com/leviemartin/HomeAssistant-Repo/main/blueprints
 
 [📖 Quick Start Guide](blueprints/QUICK_START.md) | [🔬 Scientific Details](blueprints/SUN_AWARE_UPGRADE_GUIDE.md) | [⚖️ Feature Comparison](blueprints/FEATURE_COMPARISON.md)
 
-### 3. Intelligent Living Room Lighting (mmWave + Lux Aware) ⭐ v1.10
-Advanced living room automation with Aqara FP2 mmWave presence detection, natural light awareness, and anti-flicker protection. Features sun-aware circadian rhythm integration, dynamic brightness scaling, optimized turn-off timing (day: 15/20/25 min, night: 5/10/15 min), scene cycling (cycle through 3 Philips Hue scenes). **CRITICAL FIX v1.10:** Added responsive presence detection in loop - turn-off now triggers within 1 second instead of up to 60 seconds after presence clears! Loop now checks presence immediately after delay, skipping updates if presence cleared. **v1.9:** Added presence guard to Branch 3. **v1.8:** Removed blocking condition.
+### 3. Intelligent Living Room Lighting (mmWave + Lux Aware) ⭐ v1.11
+Advanced living room automation with Aqara FP2 mmWave presence detection, natural light awareness, and anti-flicker protection. Features sun-aware circadian rhythm integration, dynamic brightness scaling, optimized turn-off timing (day: 15/20/25 min, night: 5/10/15 min), scene cycling (cycle through 3 Philips Hue scenes). **CRITICAL FIX v1.11:** FINALLY FIXED TURN-OFF! Root cause found: circadian_update (fires every 60s) + mode:restart was canceling Branch 3 loop before turn-off could run. Branch 4B now catches interrupted turn-offs and recovers. Debug logging included. **v1.10:** Responsive loop. **v1.9:** Presence guard.
 
 **Import URL:**
 ```

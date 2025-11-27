@@ -1,17 +1,18 @@
 blueprint:
-  name: Intelligent Living Room - mmWave + Lux-Aware v1.11-DEBUG
+  name: Intelligent Living Room - mmWave + Lux-Aware v1.11
   description: >
     Professional-grade lighting automation combining mmWave presence detection,
     lux-aware hysteresis anti-flicker logic, staged turn-off sequences, dynamic
     brightness adjustment, sun-aware circadian rhythm, and Philips Hue scene cycling.
 
 
-    This is v1.10 - CRITICAL FIX: Added responsive presence detection in continuous monitoring loop.
-    The issue: Loop only checked "until" condition after each 60-second iteration completed. If presence
-    cleared during the delay, loop wouldn't detect it until after delay + variable recalculation + light
-    updates, creating a window for triggers to restart automation and cancel turn-off. Fix: Added presence
-    check immediately after delay - if presence cleared, skip all updates and exit loop via "until" for
-    immediate turn-off. Result: Turn-off triggers within 1 second instead of up to 60 seconds later.
+    This is v1.11 - CRITICAL FIX: Added Branch 4B to handle circadian_update interrupting turn-off.
+    The ROOT CAUSE: circadian_update fires every 60 seconds. With mode:restart, this CANCELS the continuous
+    monitoring loop in Branch 3 before it can exit and run turn-off. When presence clears, loop tries to
+    exit, but circadian_update restarts automation. Branch 4 checks presence "on" - FAILS. Automation ends
+    without turn-off. Lights stay on forever. Fix: Branch 4B catches circadian_update when presence is OFF
+    and lights are ON, then runs full turn-off sequence. Result: Turn-off ALWAYS runs even if loop is
+    interrupted. Debug logging added throughout for troubleshooting. v1.10 added loop presence check,
     v1.9 added presence guard to Branch 3, v1.8 removed blocking condition, v1.7 fixed loop/booleans.
 
 
@@ -1552,6 +1553,124 @@ action:
                       brightness_pct: "{{ time_brightness }}"
                       color_temp: "{{ time_color_mireds }}"
                       transition: "{{ circadian_transition_sec }}"
+
+      # ======================================================================
+      # BRANCH 4B: CIRCADIAN UPDATE WITH PRESENCE OFF (TURN-OFF RECOVERY)
+      # ======================================================================
+      # CRITICAL FIX: This branch handles the case where circadian_update fires
+      # while the continuous monitoring loop in Branch 3 is trying to exit.
+      # With mode:restart, circadian_update CANCELS the loop before it can run
+      # turn-off. This branch recovers by running turn-off when:
+      # - circadian_update triggered
+      # - presence is OFF
+      # - lights are still ON (interrupted turn-off)
+      - conditions:
+          - condition: trigger
+            id: circadian_update
+          - condition: state
+            entity_id: !input presence_sensor
+            state: "off"
+          # Check if any light in target is ON (need to turn off)
+          - condition: template
+            value_template: >
+              {{ expand(target_lights.entity_id) | selectattr('state', 'eq', 'on') | list | length > 0 }}
+        sequence:
+          - service: system_log.write
+            data:
+              message: "BRANCH 4B TRIGGERED - Circadian update fired with presence OFF and lights ON, running turn-off recovery"
+              level: warning
+
+          # === PRESENCE CLEARED - START STAGED TURN-OFF ===
+          # Check if scene bypass is active first
+          - service: system_log.write
+            data:
+              message: "TURN-OFF STARTING - Scene bypass check: {{ scene_is_active and scene_bypass_timeout }}, staged_turnoff: {{ staged_turnoff }}"
+              level: warning
+
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ scene_is_active and scene_bypass_timeout }}"
+                sequence:
+                  - service: system_log.write
+                    data:
+                      message: "Presence cleared but scene {{ current_scene_state }} has bypass enabled - keeping lights on"
+                      level: info
+                  # Exit - don't proceed to turn-off
+                  - stop: "Scene bypass timeout enabled - lights stay on"
+            default: []
+
+          # No scene bypass - proceed to staged turn-off
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ staged_turnoff }}"
+                sequence:
+                  - service: system_log.write
+                    data:
+                      message: "STAGED TURN-OFF SEQUENCE STARTING - Stage 1 delay: {{ effective_stage_1_delay }} seconds"
+                      level: warning
+
+                  # Stage 1: Wait, then dim to 40% + warm to 1800K
+                  - delay:
+                      seconds: "{{ effective_stage_1_delay }}"
+
+                  - service: system_log.write
+                    data:
+                      message: "STAGE 1 EXECUTING - Dimming to 40%"
+                      level: warning
+
+                  - service: light.turn_on
+                    target: !input target_lights
+                    data:
+                      brightness_pct: "{{ stage_1_brightness_pct }}"
+                      color_temp: "{{ warning_color_temp_mireds }}"
+                      transition: 3
+
+                  # Stage 2: Wait, then dim to 20% (keep 1800K)
+                  - delay:
+                      seconds: "{{ effective_stage_2_delay - effective_stage_1_delay }}"
+
+                  - service: light.turn_on
+                    target: !input target_lights
+                    data:
+                      brightness_pct: "{{ stage_2_brightness_pct }}"
+                      color_temp: "{{ warning_color_temp_mireds }}"
+                      transition: 3
+
+                  # Stage 3: Wait, then turn off completely
+                  - delay:
+                      seconds: "{{ effective_stage_3_delay - effective_stage_2_delay }}"
+
+                  - service: system_log.write
+                    data:
+                      message: "STAGE 3 EXECUTING - Turning lights OFF"
+                      level: warning
+
+                  - service: light.turn_off
+                    target: !input target_lights
+                    data:
+                      transition: 3
+
+            default:
+              # Staged turn-off disabled - simple turn-off after stage 3 delay
+              - service: system_log.write
+                data:
+                  message: "SIMPLE TURN-OFF - Staged turn-off disabled, waiting {{ effective_stage_3_delay }} seconds then turning off"
+                  level: warning
+
+              - delay:
+                  seconds: "{{ effective_stage_3_delay }}"
+
+              - service: system_log.write
+                data:
+                  message: "SIMPLE TURN-OFF EXECUTING - Turning lights off now"
+                  level: warning
+
+              - service: light.turn_off
+                target: !input target_lights
+                data:
+                  transition: 3
 
     # === DEFAULT BRANCH (FALLBACK) ===
     default: []
