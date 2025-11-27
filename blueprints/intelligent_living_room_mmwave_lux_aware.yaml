@@ -1,5 +1,5 @@
 blueprint:
-  name: Intelligent Living Room - mmWave + Lux-Aware v1.10
+  name: Intelligent Living Room - mmWave + Lux-Aware v1.11-DEBUG
   description: >
     Professional-grade lighting automation combining mmWave presence detection,
     lux-aware hysteresis anti-flicker logic, staged turn-off sequences, dynamic
@@ -1107,6 +1107,11 @@ action:
                   - delay:
                       seconds: "{{ effective_stage_3_delay - effective_stage_2_delay }}"
 
+                  - service: system_log.write
+                    data:
+                      message: "STAGE 3 EXECUTING - Turning lights OFF"
+                      level: warning
+
                   - service: light.turn_off
                     target: !input target_lights
                     data:
@@ -1114,8 +1119,18 @@ action:
 
             default:
               # Staged turn-off disabled - simple turn-off after stage 3 delay
+              - service: system_log.write
+                data:
+                  message: "SIMPLE TURN-OFF - Staged turn-off disabled, waiting {{ effective_stage_3_delay }} seconds then turning off"
+                  level: warning
+
               - delay:
                   seconds: "{{ effective_stage_3_delay }}"
+
+              - service: system_log.write
+                data:
+                  message: "SIMPLE TURN-OFF EXECUTING - Turning lights off now"
+                  level: warning
 
               - service: light.turn_off
                 target: !input target_lights
@@ -1215,6 +1230,11 @@ action:
 
           # === CONTINUOUS PRESENCE MONITORING ===
           # While presence is active, continuously update brightness and color
+          - service: system_log.write
+            data:
+              message: "LOOP STARTING - Presence monitoring loop beginning"
+              level: warning
+
           - repeat:
               sequence:
                 # Wait for circadian update interval
@@ -1228,7 +1248,11 @@ action:
                         - condition: state
                           entity_id: !input presence_sensor
                           state: "off"
-                      sequence: []  # Presence cleared - skip updates, exit via "until"
+                      sequence:
+                        - service: system_log.write
+                          data:
+                            message: "PRESENCE CLEARED DETECTED - Skipping updates, will exit loop"
+                            level: warning
                   default:
                     # Presence still active - continue with normal updates
                     - variables:
@@ -1345,8 +1369,18 @@ action:
                   entity_id: !input presence_sensor
                   state: "off"
 
+          - service: system_log.write
+            data:
+              message: "LOOP EXITED - Presence monitoring loop has exited, proceeding to turn-off"
+              level: warning
+
           # === PRESENCE CLEARED - START STAGED TURN-OFF ===
           # Check if scene bypass is active first
+          - service: system_log.write
+            data:
+              message: "TURN-OFF STARTING - Scene bypass check: {{ scene_is_active and scene_bypass_timeout }}, staged_turnoff: {{ staged_turnoff }}"
+              level: warning
+
           - choose:
               - conditions:
                   - condition: template
@@ -1366,9 +1400,19 @@ action:
                   - condition: template
                     value_template: "{{ staged_turnoff }}"
                 sequence:
+                  - service: system_log.write
+                    data:
+                      message: "STAGED TURN-OFF SEQUENCE STARTING - Stage 1 delay: {{ effective_stage_1_delay }} seconds"
+                      level: warning
+
                   # Stage 1: Wait, then dim to 40% + warm to 1800K
                   - delay:
                       seconds: "{{ effective_stage_1_delay }}"
+
+                  - service: system_log.write
+                    data:
+                      message: "STAGE 1 EXECUTING - Dimming to 40%"
+                      level: warning
 
                   - service: light.turn_on
                     target: !input target_lights
@@ -1392,6 +1436,11 @@ action:
                   - delay:
                       seconds: "{{ effective_stage_3_delay - effective_stage_2_delay }}"
 
+                  - service: system_log.write
+                    data:
+                      message: "STAGE 3 EXECUTING - Turning lights OFF"
+                      level: warning
+
                   - service: light.turn_off
                     target: !input target_lights
                     data:
@@ -1399,8 +1448,18 @@ action:
 
             default:
               # Staged turn-off disabled - simple turn-off after stage 3 delay
+              - service: system_log.write
+                data:
+                  message: "SIMPLE TURN-OFF - Staged turn-off disabled, waiting {{ effective_stage_3_delay }} seconds then turning off"
+                  level: warning
+
               - delay:
                   seconds: "{{ effective_stage_3_delay }}"
+
+              - service: system_log.write
+                data:
+                  message: "SIMPLE TURN-OFF EXECUTING - Turning lights off now"
+                  level: warning
 
               - service: light.turn_off
                 target: !input target_lights
