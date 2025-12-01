@@ -785,6 +785,12 @@ variables:
   # Always 1800K warm during staged warnings (converted to mireds)
   warning_color_temp_mireds: "{{ (1000000 / 1800) | int }}"
 
+# === TRIGGER VARIABLES (FOR TEMPLATE TRIGGERS) ===
+# Required because !input cannot be used directly inside Jinja2 templates
+trigger_variables:
+  t_override_enabled: !input override_enabled
+  t_override_entity: !input override_trigger
+
 trigger:
   # === TRIGGER 1: PRIMARY PRESENCE DETECTION ===
   # Main presence sensor triggers automation start
@@ -828,10 +834,8 @@ trigger:
   - platform: template
     id: circadian_update
     value_template: >
-      {% set enabled = !input override_enabled %}
-      {% set trigger_entity = !input override_trigger %}
-      {% if enabled and trigger_entity %}
-        {{ now().second == 0 and is_state(trigger_entity, 'on') }}
+      {% if t_override_enabled and t_override_entity != none and t_override_entity != {} %}
+        {{ now().second == 0 and is_state(t_override_entity, 'on') }}
       {% else %}
         false
       {% endif %}
