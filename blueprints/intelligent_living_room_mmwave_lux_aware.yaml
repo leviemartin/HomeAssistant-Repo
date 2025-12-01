@@ -1,19 +1,19 @@
 blueprint:
-  name: Intelligent Living Room - mmWave + Lux-Aware v1.12-TEST
+  name: Intelligent Living Room - mmWave + Lux-Aware v1.13
   description: >
     Professional-grade lighting automation combining mmWave presence detection,
     lux-aware hysteresis anti-flicker logic, staged turn-off sequences, dynamic
     brightness adjustment, sun-aware circadian rhythm, and Philips Hue scene cycling.
 
 
-    This is v1.11 - CRITICAL FIX: Added Branch 4B to handle circadian_update interrupting turn-off.
-    The ROOT CAUSE: circadian_update fires every 60 seconds. With mode:restart, this CANCELS the continuous
-    monitoring loop in Branch 3 before it can exit and run turn-off. When presence clears, loop tries to
-    exit, but circadian_update restarts automation. Branch 4 checks presence "on" - FAILS. Automation ends
-    without turn-off. Lights stay on forever. Fix: Branch 4B catches circadian_update when presence is OFF
-    and lights are ON, then runs full turn-off sequence. Result: Turn-off ALWAYS runs even if loop is
-    interrupted. Debug logging added throughout for troubleshooting. v1.10 added loop presence check,
-    v1.9 added presence guard to Branch 3, v1.8 removed blocking condition, v1.7 fixed loop/booleans.
+    This is v1.13 - CRITICAL FIX: Fixed "Turn Off" sequence never triggering.
+    ROOT CAUSE: 'circadian_update' trigger fired every 60 seconds regardless of state.
+    With mode:restart, this repeatedly interrupted and reset the staged turn-off timer
+    when presence was cleared, preventing lights from ever turning off.
+    FIX: 1) Added 'presence_cleared' trigger to robustly initiate turn-off.
+    2) Restricted 'circadian_update' trigger to ONLY fire when Manual Override is active.
+    This prevents interruptions during normal operation or turn-off sequences.
+    Result: Turn-off sequence now runs uninterrupted.
 
 
     KEY FEATURES:
@@ -793,6 +793,14 @@ trigger:
     to: "on"
     id: presence_detected
 
+  # === TRIGGER 1B: PRESENCE CLEARED (TURN-OFF INITIATION) ===
+  # Triggers when presence is lost, ensuring turn-off sequence starts
+  # even if the continuous loop was interrupted or not running.
+  - platform: state
+    entity_id: !input presence_sensor
+    to: "off"
+    id: presence_cleared
+
   # === TRIGGER 2: APPROACH DETECTION (OPTIONAL) ===
   # Approach sensor triggers immediate activation (bypasses lux check temporarily)
   - platform: state
@@ -812,11 +820,21 @@ trigger:
     entity_id: !input scene_cycle_button
     id: scene_cycle_pressed
 
-  # === TRIGGER 4: CIRCADIAN UPDATE CYCLE ===
-  # Periodic update for circadian color temperature (every 60 seconds by default)
-  - platform: time_pattern
-    minutes: "/1"
+  # === TRIGGER 4: CIRCADIAN UPDATE (OVERRIDE ONLY) ===
+  # Periodic update for circadian color temperature (every 60 seconds).
+  # CRITICAL: Only fires if Override is ACTIVE. Normal presence updates are handled
+  # by the continuous loop in Branch 3. This prevents this trigger from interrupting
+  # the turn-off sequence (which happens when presence is off).
+  - platform: template
     id: circadian_update
+    value_template: >
+      {% set enabled = !input override_enabled %}
+      {% set trigger_entity = !input override_trigger %}
+      {% if enabled and trigger_entity %}
+        {{ now().second == 0 and is_state(trigger_entity, 'on') }}
+      {% else %}
+        false
+      {% endif %}
 
   # === TRIGGER 5: LUX EXCEEDED OFF THRESHOLD ===
   # Lux sensor triggers when ambient light exceeds OFF threshold
@@ -1470,11 +1488,11 @@ action:
                   transition: 3
 
       # ======================================================================
-      # BRANCH 4: CIRCADIAN UPDATE CYCLE (BACKGROUND UPDATES)
+      # BRANCH 4: CIRCADIAN UPDATE (OVERRIDE MODE ONLY)
       # ======================================================================
-      # NOTE: This branch handles time_pattern updates when lights are manually on
-      # without presence detection. The continuous presence loop in Branch 3 is the
-      # primary circadian update mechanism during normal occupancy.
+      # Handles updates when Manual Override is active.
+      # Normal presence updates are handled by Branch 3 loop.
+      # This branch runs ONLY if Override is active (enforced by trigger).
       - conditions:
           - condition: trigger
             id: circadian_update
@@ -1483,10 +1501,6 @@ action:
           # Skip if scene is active (scene overrides circadian)
           - condition: template
             value_template: "{{ not scene_is_active }}"
-          # Only proceed if presence is detected (this branch complements the loop)
-          - condition: state
-            entity_id: !input presence_sensor
-            state: "on"
         sequence:
           # Recalculate current values (variables from top are stale)
           - variables:
@@ -1557,21 +1571,14 @@ action:
                       transition: "{{ circadian_transition_sec }}"
 
       # ======================================================================
-      # BRANCH 4B: CIRCADIAN UPDATE WITH PRESENCE OFF (TURN-OFF RECOVERY)
+      # BRANCH 5: PRESENCE CLEARED (TURN-OFF INITIATION)
       # ======================================================================
-      # CRITICAL FIX: This branch handles the case where circadian_update fires
-      # while the continuous monitoring loop in Branch 3 is trying to exit.
-      # With mode:restart, circadian_update CANCELS the loop before it can run
-      # turn-off. This branch recovers by running turn-off when:
-      # - circadian_update triggered
-      # - presence is OFF
-      # - lights are still ON (interrupted turn-off)
+      # Handles turn-off when presence is lost.
+      # Critical for reliability: Runs even if Branch 3 loop was interrupted.
+      # Now triggered specifically by 'presence_cleared' trigger.
       - conditions:
           - condition: trigger
-            id: circadian_update
-          - condition: state
-            entity_id: !input presence_sensor
-            state: "off"
+            id: presence_cleared
           # Check if any light in target is ON (need to turn off)
           - condition: template
             value_template: >
@@ -1579,16 +1586,25 @@ action:
         sequence:
           - service: system_log.write
             data:
-              message: "BRANCH 4B TRIGGERED - Circadian update fired with presence OFF and lights ON, running turn-off recovery"
+              message: "BRANCH 5 TRIGGERED - Presence cleared, initiating turn-off sequence checks"
               level: warning
 
-          # === PRESENCE CLEARED - START STAGED TURN-OFF ===
-          # Check if scene bypass is active first
-          - service: system_log.write
-            data:
-              message: "TURN-OFF STARTING - Scene bypass check: {{ scene_is_active and scene_bypass_timeout }}, staged_turnoff: {{ staged_turnoff }}"
-              level: warning
+          # === CHECK OVERRIDE FIRST ===
+          # If manual override is active, DO NOT turn off
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ override_active }}"
+                sequence:
+                  - service: system_log.write
+                    data:
+                      message: "Presence cleared but Manual Override is active - keeping lights on"
+                      level: info
+                  - stop: "Manual Override active"
+            default: []
 
+          # === CHECK SCENE BYPASS SECOND ===
+          # If scene bypass is active, DO NOT turn off
           - choose:
               - conditions:
                   - condition: template
@@ -1596,13 +1612,18 @@ action:
                 sequence:
                   - service: system_log.write
                     data:
-                      message: "Presence cleared but scene {{ current_scene_state }} has bypass enabled - keeping lights on"
+                      message: "Presence cleared but Scene Bypass is active - keeping lights on"
                       level: info
-                  # Exit - don't proceed to turn-off
-                  - stop: "Scene bypass timeout enabled - lights stay on"
+                  - stop: "Scene bypass timeout enabled"
             default: []
 
-          # No scene bypass - proceed to staged turn-off
+          # === PROCEED TO STAGED TURN-OFF ===
+          - service: system_log.write
+            data:
+              message: "TURN-OFF STARTING - No overrides active, starting staged turn-off sequence"
+              level: warning
+
+          # No scene bypass/override - proceed to staged turn-off
           - choose:
               - conditions:
                   - condition: template
