@@ -1,5 +1,5 @@
 blueprint:
-  name: Intelligent Living Room - mmWave + Lux-Aware v1.11
+  name: Intelligent Living Room - mmWave + Lux-Aware v1.12-TEST
   description: >
     Professional-grade lighting automation combining mmWave presence detection,
     lux-aware hysteresis anti-flicker logic, staged turn-off sequences, dynamic
@@ -680,27 +680,12 @@ variables:
       false
     {% endif %}
 
-  # === EFFECTIVE STAGED DELAYS (SWITCHES BASED ON NIGHT MODE) ===
-  effective_stage_1_delay: >
-    {% if is_night_mode_active %}
-      {{ night_stage_1_delay_sec }}
-    {% else %}
-      {{ stage_1_delay_sec }}
-    {% endif %}
-
-  effective_stage_2_delay: >
-    {% if is_night_mode_active %}
-      {{ night_stage_2_delay_sec }}
-    {% else %}
-      {{ stage_2_delay_sec }}
-    {% endif %}
-
-  effective_stage_3_delay: >
-    {% if is_night_mode_active %}
-      {{ night_stage_3_delay_sec }}
-    {% else %}
-      {{ stage_3_delay_sec }}
-    {% endif %}
+  # === SIMPLIFIED HARDCODED DELAYS (TESTING) ===
+  # Removed night mode complexity for testing
+  # Stage 1: 10 minutes, Stage 2: 12 minutes, Stage 3: 15 minutes
+  effective_stage_1_delay: 600
+  effective_stage_2_delay: 720
+  effective_stage_3_delay: 900
 
   # === CURRENT LUX READING ===
   current_lux: "{{ states(lux_sensor_entity) | float(0) }}"
@@ -852,6 +837,12 @@ trigger:
     id: lux_dropped
 
 action:
+  # === LOG WHICH TRIGGER FIRED ===
+  - service: system_log.write
+    data:
+      message: "AUTOMATION TRIGGERED - Trigger ID: {{ trigger.id }}, Presence: {{ states(presence_sensor_entity) }}, Lights: {{ expand(target_lights.entity_id) | selectattr('state', 'eq', 'on') | list | length }} on"
+      level: warning
+
   # === ACTION FLOW DECISION TREE ===
   - choose:
       # ======================================================================
@@ -1238,9 +1229,20 @@ action:
 
           - repeat:
               sequence:
+                # Log current iteration start with presence state
+                - service: system_log.write
+                  data:
+                    message: "LOOP ITERATION START - Presence sensor: {{ states(presence_sensor_entity) }}, About to delay {{ circadian_update_sec }} seconds"
+                    level: warning
+
                 # Wait for circadian update interval
                 - delay:
                     seconds: "{{ circadian_update_sec }}"
+
+                - service: system_log.write
+                  data:
+                    message: "LOOP AFTER DELAY - Presence sensor now: {{ states(presence_sensor_entity) }}, Checking if cleared..."
+                    level: warning
 
                 # CRITICAL: Check if presence cleared during delay
                 # If so, skip updates and exit loop immediately via "until" condition
@@ -1372,7 +1374,7 @@ action:
 
           - service: system_log.write
             data:
-              message: "LOOP EXITED - Presence monitoring loop has exited, proceeding to turn-off"
+              message: "LOOP EXITED - Presence monitoring loop has exited, presence sensor state: {{ states(presence_sensor_entity) }}, proceeding to turn-off"
               level: warning
 
           # === PRESENCE CLEARED - START STAGED TURN-OFF ===
