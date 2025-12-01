@@ -22,15 +22,28 @@ https://raw.githubusercontent.com/leviemartin/HomeAssistant-Repo/main/blueprints
 
 [📖 Quick Start Guide](blueprints/QUICK_START.md) | [🔬 Scientific Details](blueprints/SUN_AWARE_UPGRADE_GUIDE.md) | [⚖️ Feature Comparison](blueprints/FEATURE_COMPARISON.md)
 
-### 3. Intelligent Living Room Lighting (mmWave + Lux Aware) ⭐ v1.11
-Advanced living room automation with Aqara FP2 mmWave presence detection, natural light awareness, and anti-flicker protection. Features sun-aware circadian rhythm integration, dynamic brightness scaling, optimized turn-off timing (day: 15/20/25 min, night: 5/10/15 min), scene cycling (cycle through 3 Philips Hue scenes). **CRITICAL FIX v1.11:** FINALLY FIXED TURN-OFF! Root cause found: circadian_update (fires every 60s) + mode:restart was canceling Branch 3 loop before turn-off could run. Branch 4B now catches interrupted turn-offs and recovers. Debug logging included. **v1.10:** Responsive loop. **v1.9:** Presence guard.
+### 3. Intelligent Living Room v2.0 - Clean Rewrite 🆕 ⭐ **RECOMMENDED**
+**Complete rewrite from scratch for reliability!** mmWave presence detection with sun-aware circadian rhythm (1800K-5500K), **evening warm override** (forces warm colors after 18:20 for kids' bedtime prep), lux awareness, and simple 10/12/15 minute staged turn-off. Uses `mode:single` with `wait_for_trigger` - no complex loops, no restart issues. **Perfect for families with kids!**
+
+**Import URL:**
+```
+https://raw.githubusercontent.com/leviemartin/HomeAssistant-Repo/main/blueprints/intelligent_living_room_v2.yaml
+```
+
+**Key Features:**
+- ✅ Sun-aware circadian (adapts to seasons automatically)
+- ✅ Evening warm override (warm colors after 18:20 regardless of sun)
+- ✅ Simple, reliable turn-off (no stuck automations!)
+- ✅ Lux-aware (turn on when dark, off when bright)
+- ✅ Clean architecture (mode:single, no complex branching)
+
+### 3b. Intelligent Living Room v1.11 - Legacy Version
+Original complex version with scene cycling, approach detection, and dynamic brightness. **Note:** Has known reliability issues. **Use v2.0 above instead.**
 
 **Import URL:**
 ```
 https://raw.githubusercontent.com/leviemartin/HomeAssistant-Repo/main/blueprints/intelligent_living_room_mmwave_lux_aware.yaml
 ```
-
-[📖 Quick Start](blueprints/INTELLIGENT_LIVING_ROOM_QUICK_START.md) | [📘 Complete Setup Guide](blueprints/INTELLIGENT_LIVING_ROOM_SETUP_GUIDE.md) | [🔬 Anti-Flicker Technical Guide](blueprints/ANTI_FLICKER_TECHNICAL_GUIDE.md) | [📡 FP2 Features Reference](blueprints/FP2_FEATURES_REFERENCE.md)
 
 ### 4. Adjacent Zone Motion Sensor with Circadian Lighting ⭐ v1.7
 Motion-activated lighting for hallways, bathrooms, and stairs with GUARANTEED color consistency to the living room blueprint. Uses identical circadian formulas (1800K-5500K) with hardcoded Quick timing (5/10/15 min = 15 min total) optimized for quick-transition spaces. **NEW v1.7:** Lux sensor is now OPTIONAL - perfect for windowless bathrooms where motion should ALWAYS turn on lights! **v1.6:** Added lux trigger for sunny conditions.

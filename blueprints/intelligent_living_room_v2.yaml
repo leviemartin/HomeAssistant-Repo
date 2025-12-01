@@ -1,0 +1,380 @@
+blueprint:
+  name: Intelligent Living Room v2.0 - Clean Rewrite
+  description: >
+    Simplified, reliable living room automation with mmWave presence detection,
+    sun-aware circadian rhythm (with evening warm override for kids), lux awareness,
+    and staged turn-off sequence. Built from scratch with clean architecture.
+
+
+    KEY FEATURES:
+    - mmWave presence detection (Aqara FP2 compatible)
+    - Sun-aware circadian rhythm (1800K-5500K based on sun elevation)
+    - Evening warm override (forces warm colors after 18:20 for kids' bedtime)
+    - Lux awareness (turn on when dark, off when bright)
+    - Staged turn-off: 10 min (dim 40%) → 12 min (dim 20%) → 15 min (OFF)
+    - mode:single (no restart issues!)
+
+
+    VERSION: 2.0 (Complete rewrite for reliability)
+
+  domain: automation
+
+  input:
+    # === LIGHTS ===
+    target_lights:
+      name: Target Lights
+      description: The lights to control
+      selector:
+        target:
+          entity:
+            - domain: light
+
+    # === PRESENCE SENSOR ===
+    presence_sensor:
+      name: Presence Sensor
+      description: mmWave or PIR presence sensor (Aqara FP2, etc.)
+      selector:
+        entity:
+          filter:
+            - domain: binary_sensor
+              device_class: occupancy
+
+    # === LUX SENSOR ===
+    lux_sensor:
+      name: Lux/Illuminance Sensor
+      description: Light level sensor for automatic on/off
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              device_class: illuminance
+
+    lux_turn_on_threshold:
+      name: Lux Turn-ON Threshold
+      description: Turn on lights when lux drops below this (default 80)
+      default: 80
+      selector:
+        number:
+          min: 0
+          max: 500
+          unit_of_measurement: lux
+
+    lux_turn_off_threshold:
+      name: Lux Turn-OFF Threshold
+      description: Turn off lights when lux rises above this (default 150)
+      default: 150
+      selector:
+        number:
+          min: 0
+          max: 1000
+          unit_of_measurement: lux
+
+    # === CIRCADIAN RHYTHM ===
+    circadian_enabled:
+      name: Enable Circadian Rhythm
+      description: Automatically adjust color temperature based on sun position
+      default: true
+      selector:
+        boolean:
+
+    evening_warm_start:
+      name: Evening Warm Start Time
+      description: Force warm colors after this time (for kids' bedtime prep, default 18:20)
+      default: "18:20:00"
+      selector:
+        time:
+
+    # === BRIGHTNESS ===
+    default_brightness:
+      name: Default Brightness
+      description: Brightness percentage when lights turn on
+      default: 100
+      selector:
+        number:
+          min: 1
+          max: 100
+          unit_of_measurement: "%"
+
+# === MODE: SINGLE (NO RESTART!) ===
+mode: single
+max_exceeded: silent
+
+variables:
+  # Store inputs as variables
+  presence_sensor_entity: !input presence_sensor
+  lux_sensor_entity: !input lux_sensor
+  lux_on_threshold: !input lux_turn_on_threshold
+  lux_off_threshold: !input lux_turn_off_threshold
+  circadian_enabled_var: !input circadian_enabled
+  evening_warm_start_time: !input evening_warm_start
+  default_brightness_pct: !input default_brightness
+
+  # Current states
+  current_lux: "{{ states(lux_sensor_entity) | float(0) }}"
+  sun_elevation: "{{ state_attr('sun.sun', 'elevation') | float(0) }}"
+
+  # Time check for evening warm override
+  current_time_seconds: >
+    {{ now().hour * 3600 + now().minute * 60 + now().second }}
+  evening_warm_seconds: >
+    {{ (evening_warm_start_time.split(':')[0] | int) * 3600 +
+       (evening_warm_start_time.split(':')[1] | int) * 60 }}
+  is_after_evening_warm: >
+    {{ current_time_seconds >= evening_warm_seconds }}
+
+  # Circadian color calculation
+  color_temp_kelvin: >
+    {% if circadian_enabled_var %}
+      {# If after evening warm time, force warm color for kids #}
+      {% if is_after_evening_warm %}
+        1800
+      {% else %}
+        {# Calculate based on sun elevation #}
+        {% set elevation = sun_elevation | float %}
+        {% if elevation < -6 %}
+          1800
+        {% elif elevation >= -6 and elevation < 0 %}
+          {{ (1800 + (elevation + 6) * 200) | int }}
+        {% elif elevation >= 0 and elevation < 10 %}
+          {{ (3000 + (elevation * 50)) | int }}
+        {% elif elevation >= 10 and elevation < 30 %}
+          {{ (3500 + (elevation - 10) * 75) | int }}
+        {% elif elevation >= 30 and elevation < 50 %}
+          {{ (5000 + (elevation - 30) * 25) | int }}
+        {% else %}
+          5500
+        {% endif %}
+      {% endif %}
+    {% else %}
+      3000
+    {% endif %}
+
+  color_temp_mireds: "{{ (1000000 / color_temp_kelvin|int) | int }}"
+
+trigger:
+  # Presence detected
+  - platform: state
+    entity_id: !input presence_sensor
+    to: "on"
+    id: presence_on
+
+  # Presence cleared
+  - platform: state
+    entity_id: !input presence_sensor
+    to: "off"
+    id: presence_off
+
+  # Lux dropped below ON threshold
+  - platform: numeric_state
+    entity_id: !input lux_sensor
+    below: !input lux_turn_on_threshold
+    id: lux_dropped
+
+  # Lux exceeded OFF threshold
+  - platform: numeric_state
+    entity_id: !input lux_sensor
+    above: !input lux_turn_off_threshold
+    id: lux_exceeded
+
+  # Time pattern for circadian updates
+  - platform: time_pattern
+    minutes: "/1"
+    id: circadian_update
+
+action:
+  - choose:
+      # ======================================================================
+      # PRESENCE ON: Turn on lights if lux is low
+      # ======================================================================
+      - conditions:
+          - condition: trigger
+            id: presence_on
+        sequence:
+          - if:
+              - condition: template
+                value_template: "{{ current_lux < lux_on_threshold }}"
+            then:
+              - service: light.turn_on
+                target: !input target_lights
+                data:
+                  brightness_pct: "{{ default_brightness_pct }}"
+                  color_temp: "{{ color_temp_mireds }}"
+                  transition: 2
+
+              - service: system_log.write
+                data:
+                  message: "Presence ON - Lights turned on (lux: {{ current_lux }}, color: {{ color_temp_kelvin }}K)"
+                  level: info
+
+      # ======================================================================
+      # PRESENCE OFF: Start staged turn-off sequence
+      # ======================================================================
+      - conditions:
+          - condition: trigger
+            id: presence_off
+        sequence:
+          - service: system_log.write
+            data:
+              message: "Presence OFF - Starting staged turn-off sequence"
+              level: warning
+
+          # Stage 1: Wait 10 minutes, then dim to 40%
+          - wait_for_trigger:
+              - platform: state
+                entity_id: !input presence_sensor
+                to: "on"
+            timeout:
+              seconds: 600  # 10 minutes
+            continue_on_timeout: true
+
+          - if:
+              - condition: template
+                value_template: "{{ wait.trigger == none }}"
+            then:
+              # Timeout - presence still off, proceed with Stage 1
+              - service: light.turn_on
+                target: !input target_lights
+                data:
+                  brightness_pct: 40
+                  color_temp: 555  # 1800K warm
+                  transition: 3
+
+              - service: system_log.write
+                data:
+                  message: "Stage 1: Dimmed to 40% (10 min elapsed)"
+                  level: warning
+
+              # Stage 2: Wait 2 more minutes, then dim to 20%
+              - wait_for_trigger:
+                  - platform: state
+                    entity_id: !input presence_sensor
+                    to: "on"
+                timeout:
+                  seconds: 120  # 2 minutes (12 min total)
+                continue_on_timeout: true
+
+              - if:
+                  - condition: template
+                    value_template: "{{ wait.trigger == none }}"
+                then:
+                  # Timeout - presence still off, proceed with Stage 2
+                  - service: light.turn_on
+                    target: !input target_lights
+                    data:
+                      brightness_pct: 20
+                      color_temp: 555
+                      transition: 3
+
+                  - service: system_log.write
+                    data:
+                      message: "Stage 2: Dimmed to 20% (12 min elapsed)"
+                      level: warning
+
+                  # Stage 3: Wait 3 more minutes, then turn OFF
+                  - wait_for_trigger:
+                      - platform: state
+                        entity_id: !input presence_sensor
+                        to: "on"
+                    timeout:
+                      seconds: 180  # 3 minutes (15 min total)
+                    continue_on_timeout: true
+
+                  - if:
+                      - condition: template
+                        value_template: "{{ wait.trigger == none }}"
+                    then:
+                      # Timeout - presence still off, turn OFF
+                      - service: light.turn_off
+                        target: !input target_lights
+                        data:
+                          transition: 3
+
+                      - service: system_log.write
+                        data:
+                          message: "Stage 3: Lights OFF (15 min elapsed)"
+                          level: warning
+                    else:
+                      # Presence returned during Stage 3 wait
+                      - service: system_log.write
+                        data:
+                          message: "Presence returned during Stage 3 - Canceling turn-off"
+                          level: info
+                else:
+                  # Presence returned during Stage 2 wait
+                  - service: system_log.write
+                    data:
+                      message: "Presence returned during Stage 2 - Canceling turn-off"
+                      level: info
+            else:
+              # Presence returned during Stage 1 wait
+              - service: system_log.write
+                data:
+                  message: "Presence returned during Stage 1 - Canceling turn-off"
+                  level: info
+
+      # ======================================================================
+      # LUX DROPPED: Turn on lights if presence detected
+      # ======================================================================
+      - conditions:
+          - condition: trigger
+            id: lux_dropped
+          - condition: state
+            entity_id: !input presence_sensor
+            state: "on"
+        sequence:
+          - service: light.turn_on
+            target: !input target_lights
+            data:
+              brightness_pct: "{{ default_brightness_pct }}"
+              color_temp: "{{ color_temp_mireds }}"
+              transition: 2
+
+          - service: system_log.write
+            data:
+              message: "Lux dropped - Lights turned on (lux: {{ current_lux }})"
+              level: info
+
+      # ======================================================================
+      # LUX EXCEEDED: Turn off lights
+      # ======================================================================
+      - conditions:
+          - condition: trigger
+            id: lux_exceeded
+        sequence:
+          - service: light.turn_off
+            target: !input target_lights
+            data:
+              transition: 5
+
+          - service: system_log.write
+            data:
+              message: "Lux exceeded - Lights turned off (lux: {{ current_lux }})"
+              level: info
+
+      # ======================================================================
+      # CIRCADIAN UPDATE: Update color if lights on and presence detected
+      # ======================================================================
+      - conditions:
+          - condition: trigger
+            id: circadian_update
+          - condition: state
+            entity_id: !input presence_sensor
+            state: "on"
+          - condition: template
+            value_template: "{{ circadian_enabled_var }}"
+        sequence:
+          # Check if lights are on before updating
+          - if:
+              - condition: template
+                value_template: "{{ expand(target_lights.entity_id) | selectattr('state', 'eq', 'on') | list | length > 0 }}"
+            then:
+              - service: light.turn_on
+                target: !input target_lights
+                data:
+                  color_temp: "{{ color_temp_mireds }}"
+                  transition: 4
+
+              - service: system_log.write
+                data:
+                  message: "Circadian update - Color: {{ color_temp_kelvin }}K, Sun: {{ sun_elevation }}°, Evening mode: {{ is_after_evening_warm }}"
+                  level: debug
