@@ -1,5 +1,5 @@
 blueprint:
-  name: Intelligent Living Room v2.0 - Clean Rewrite
+  name: Intelligent Living Room v2.0.1 - Clean Rewrite
   description: >
     Simplified, reliable living room automation with mmWave presence detection,
     sun-aware circadian rhythm (with evening warm override for kids), lux awareness,
@@ -101,6 +101,7 @@ max_exceeded: silent
 
 variables:
   # Store inputs as variables
+  target_lights_entity: !input target_lights
   presence_sensor_entity: !input presence_sensor
   lux_sensor_entity: !input lux_sensor
   lux_on_threshold: !input lux_turn_on_threshold
@@ -366,7 +367,7 @@ action:
           # Check if lights are on before updating
           - if:
               - condition: template
-                value_template: "{{ expand(target_lights.entity_id) | selectattr('state', 'eq', 'on') | list | length > 0 }}"
+                value_template: "{{ expand(target_lights_entity.entity_id) | selectattr('state', 'eq', 'on') | list | length > 0 }}"
             then:
               - service: light.turn_on
                 target: !input target_lights
