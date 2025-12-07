@@ -4,7 +4,7 @@ This file provides guidance to Google Gemini when working with code in this repo
 
 ## Repository Purpose
 
-This is a Home Assistant blueprint repository containing **5 production blueprints** for intelligent lighting automation. All blueprints are scientifically-backed, optimized for Philips Hue compatibility, and designed to promote better sleep, health, and wellbeing through optimized light control.
+This is a Home Assistant blueprint repository containing **6 production blueprints** for intelligent lighting automation. All blueprints are scientifically-backed, optimized for Philips Hue compatibility, and designed to promote better sleep, health, and wellbeing through optimized light control.
 
 ## Repository Structure
 
@@ -12,9 +12,10 @@ This is a Home Assistant blueprint repository containing **5 production blueprin
 /blueprints/                              # Production blueprint files
   circadian_rhythm_lighting.yaml          # Original fixed-time circadian (v1.0)
   circadian_rhythm_lighting_sun_aware.yaml # Sun-tracking circadian (v2.0)
-  intelligent_living_room_mmwave_lux_aware.yaml # mmWave + lux-aware (v1.9)
+  intelligent_living_room_mmwave_lux_aware.yaml # mmWave + lux-aware (v1.10)
   adjacent_zone_motion_circadian_lighting.yaml # Adjacent zone motion (v1.7)
   child_night_light.yaml                  # Child-friendly night light (v1.0)
+  child_wake_indicator_night_light.yaml   # OK-to-Wake indicator light (v1.0)
 
   # Blueprint documentation
   *.md                                    # Quick starts, setup guides, technical docs
@@ -162,6 +163,33 @@ README.md                                 # Main repository documentation
   - Ultra-low brightness (3% default, ~1-2 lux)
   - Motion-activated brightness boost
   - RGB color conversion for non-color_temp lights
+
+### 6. Child Wake-Up Indicator Night Light (OK-to-Wake)
+- **File**: `child_wake_indicator_night_light.yaml`
+- **Version**: 1.0
+- **Color Mode**: RGB (not color_temp) for Third Reality compatibility
+- **Design Philosophy**: "Red means bed, Green means GO!" stoplight system
+- **Special Features**:
+  - Per-day configurable wake-up times (7 inputs, one per day)
+  - Sleep color (default: warm red [255, 50, 0]) signals "stay in bed"
+  - Wake-up color (default: green [0, 255, 0]) signals "OK to get up"
+  - Optional warning color (yellow [255, 180, 0]) 5-30 min before wake-up
+  - Gradual wake-up transition (10-300 seconds configurable)
+  - Motion-activated brightness boost during sleep time only
+  - Wake-up auto-off after configurable duration (15-180 min)
+- **Mode**: `queued` (max: 3) - ensures reliable operation
+  - Prevents restart mode issues (motion cancelling wake-up sequence)
+  - All time-based triggers processed in order
+- **Key Implementation Details**:
+  - Uses `trigger_variables` for wake-up time calculations at trigger evaluation
+  - Template trigger for warning time with 59-second window for reliability
+  - Day validation prevents wrong day's trigger from running
+  - State recalculation after motion boost handles time boundary crossings
+- **Research Basis**:
+  - Red/amber minimizes melatonin suppression (Nagare et al., 2019)
+  - Green for wake-up follows pediatric sleep consultant recommendations
+  - Gradual transitions reduce startle response
+  - Ultra-low brightness (1-5%) protects developing eyes
 
 ## Critical Technical Patterns
 

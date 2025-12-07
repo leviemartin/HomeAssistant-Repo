@@ -1,6 +1,6 @@
 # Home Assistant Blueprints - Research-Backed Lighting Automation
 
-Scientifically-backed Home Assistant blueprints for intelligent lighting automation. Each blueprint is built on peer-reviewed research to promote better sleep, health, and wellbeing through optimized light control.
+Scientifically-backed Home Assistant blueprints for intelligent lighting automation. This repository contains **6 production blueprints** built on peer-reviewed research to promote better sleep, health, and wellbeing through optimized light control.
 
 ## Available Blueprints
 
@@ -62,6 +62,31 @@ Research-based night light automation specifically designed for young children's
 ```
 https://raw.githubusercontent.com/leviemartin/HomeAssistant-Repo/main/blueprints/child_night_light.yaml
 ```
+
+### 6. Child Wake-Up Indicator Night Light (v1.0) ⭐ NEW
+"OK to Wake" style night light that teaches children when to stay in bed vs. when it's OK to get up using colors. Based on the popular "stoplight" system recommended by pediatric sleep consultants: **Red means bed, Green means GO!**
+
+**Import URL:**
+```
+https://raw.githubusercontent.com/leviemartin/HomeAssistant-Repo/main/blueprints/child_wake_indicator_night_light.yaml
+```
+
+**Key Features:**
+- **Per-day wake-up times**: Different times for each day (weekday/weekend support)
+- **Sleep color** (default: warm red): Ultra-warm to protect melatonin
+- **Wake-up color** (default: green): Clear visual signal it's OK to get up
+- **Optional "almost time" warning**: Yellow color before wake-up teaches patience
+- **Gradual wake-up transition**: Smooth 10-300 second fade from sleep to wake-up color
+- **Motion brightness boost**: For parent check-ins during sleep time
+- **Wake-up auto-off**: Automatically turns off after configurable duration
+- **Third Reality compatible**: Uses RGB colors (not color_temp)
+
+**Research Basis:**
+- Red/amber nighttime colors based on studies showing minimal melatonin suppression
+- Green for wake-up follows the well-established "stoplight" system
+- Gradual transitions reduce startle response and support circadian rhythm
+
+**Best for:** Children ages 2-5 who can understand simple color associations.
 
 ---
 
