@@ -1,0 +1,728 @@
+blueprint:
+  name: "Child Wake-Up Indicator Night Light (v1.0)"
+  description: >
+    A scientifically-backed "OK to Wake" night light automation for young children (ages 2-5).
+    Based on peer-reviewed research and child development best practices, this blueprint uses
+    color changes to teach children when they should stay in bed vs. when it's OK to get up.
+
+
+    KEY CONCEPT: "Red means bed, Green means GO!"
+
+    - SLEEP COLOR (default: warm red/amber): Signals "stay in bed" - uses ultra-warm tones
+      (2000K equivalent) that minimize melatonin suppression
+
+    - WAKE-UP COLOR (default: green): Signals "OK to get up!" - a clear visual cue that
+      wake-up time has arrived
+
+
+    FEATURES:
+
+    - Per-day wake-up times: Different times for each day of the week (weekday/weekend support)
+
+    - Gradual wake-up transition: Smooth fade from sleep color to wake-up color over a
+      configurable duration (default 60 seconds) for gentle, non-jarring wake-up
+
+    - Optional "almost time" warning: Yellow/orange color 5-30 minutes before wake-up time
+      to help children anticipate the transition (like commercial OK-to-Wake clocks)
+
+    - Motion-activated brightness boost: Higher brightness when motion detected, helpful
+      for nighttime bathroom trips or parent check-ins
+
+    - Wake-up timeout: Automatically turns off lights after wake-up period ends
+
+    - Compatible with RGB lights (Third Reality, LIFX) and tunable white lights (Philips Hue)
+
+
+    RESEARCH BASIS:
+
+    - Red/amber nighttime colors based on studies showing minimal melatonin suppression
+      even at higher intensities (Nagare et al., 2019)
+
+    - Green for wake-up follows the well-established "stoplight" system recommended by
+      pediatric sleep consultants (Taking Cara Babies, Little Peach Sleep, Pediatric Sleep Coach)
+
+    - Gradual transitions reduce startle response and support circadian rhythm entrainment
+
+    - Ultra-low brightness (1-5%) protects children's developing eyes and sleep quality
+
+
+    Best for children ages 2-5 who can understand simple color associations.
+    Younger children (under 2) may not yet connect colors to behavior expectations.
+
+  domain: automation
+  source_url: https://github.com/leviemartin/HomeAssistant-Repo/blob/main/blueprints/child_wake_indicator_night_light.yaml
+
+  input:
+    # === LIGHTS SECTION ===
+    target_lights:
+      name: Night Lights
+      description: >
+        Select the lights to use as OK-to-Wake indicator lights. Compatible with RGB lights
+        (Third Reality, LIFX Color) or tunable white/color temperature lights (Philips Hue,
+        IKEA TRADFRI). For best results, use lights that support very low brightness levels
+        and have good color rendering.
+      selector:
+        target:
+          entity:
+            - domain: light
+
+    # === SLEEP COLOR SETTINGS ===
+    sleep_color:
+      name: Sleep Color (Stay in Bed)
+      description: >
+        The color displayed during sleep time that signals "stay in bed." Research strongly
+        recommends warm red/amber tones for children's sleep. Default is warm red [255, 50, 0]
+        which approximates 2000K and has minimal impact on melatonin production.
+
+        IMPORTANT: Keep this color warm (red/orange/amber). Cool colors like blue or white
+        will disrupt your child's sleep even at low brightness.
+      default: [255, 50, 0]
+      selector:
+        color_rgb:
+
+    sleep_brightness:
+      name: Sleep Brightness
+      description: >
+        Brightness level during sleep time. Based on research, this should be VERY LOW (1-5%)
+        to minimize melatonin suppression. Default is 3%, which provides gentle visibility
+        without disrupting sleep. Even 5 lux can suppress melatonin by 78% in preschool
+        children, so keeping lights dim is critical.
+      default: 3
+      selector:
+        number:
+          min: 1
+          max: 15
+          step: 1
+          unit_of_measurement: "%"
+          mode: slider
+
+    # === WAKE-UP COLOR SETTINGS ===
+    wakeup_color:
+      name: Wake-Up Color (OK to Get Up)
+      description: >
+        The color displayed when it's OK to wake up. Green is the most common choice
+        ("Green means GO!"), but you can use your child's favorite color for better
+        engagement. Blue, purple, or soft white also work well. Avoid red/amber as
+        these are reserved for sleep time.
+
+        TIP: Let your child help choose this color to increase buy-in and understanding!
+      default: [0, 255, 0]
+      selector:
+        color_rgb:
+
+    wakeup_brightness:
+      name: Wake-Up Brightness
+      description: >
+        Brightness level during wake-up time. This can be higher than sleep brightness
+        since the child is expected to be awake. However, keep it moderate (10-30%) to
+        avoid being jarring if the child happens to still be asleep. The brightness
+        increase itself serves as an additional wake-up cue.
+      default: 15
+      selector:
+        number:
+          min: 5
+          max: 50
+          step: 1
+          unit_of_measurement: "%"
+          mode: slider
+
+    wakeup_transition:
+      name: Wake-Up Transition Duration
+      description: >
+        How long should the fade from sleep color to wake-up color take? A gradual
+        transition is gentler and less likely to startle the child. The light will
+        smoothly fade from red to green (or your chosen colors) over this duration.
+
+        Recommended: 30-90 seconds for a gentle, sunrise-like effect.
+        Shorter (10-30 sec) for children who wake easily.
+        Longer (90-180 sec) for a more gradual, calming transition.
+      default: 60
+      selector:
+        number:
+          min: 10
+          max: 300
+          step: 10
+          unit_of_measurement: seconds
+          mode: slider
+
+    # === OPTIONAL "ALMOST TIME" WARNING ===
+    warning_enabled:
+      name: Enable "Almost Wake-Up Time" Warning
+      description: >
+        Enable a yellow/orange warning color that appears before wake-up time. This
+        helps children anticipate the transition and teaches patience. Many commercial
+        OK-to-Wake clocks include this feature.
+
+        When enabled, the light will change to the warning color X minutes before
+        wake-up time, then transition to the wake-up color at the actual wake-up time.
+      default: false
+      selector:
+        boolean:
+
+    warning_color:
+      name: Warning Color (Almost Time)
+      description: >
+        The color displayed during the "almost time" warning period. Yellow or orange
+        works well as a "stoplight" middle color between red (sleep) and green (wake).
+        Only used if warning is enabled.
+      default: [255, 180, 0]
+      selector:
+        color_rgb:
+
+    warning_minutes_before:
+      name: Warning Minutes Before Wake-Up
+      description: >
+        How many minutes before wake-up time should the warning color appear?
+        This gives children time to wake up naturally and anticipate the transition.
+        5-15 minutes works well for most children; longer periods (15-30 min) help
+        children who struggle with the wait.
+      default: 10
+      selector:
+        number:
+          min: 5
+          max: 30
+          step: 5
+          unit_of_measurement: minutes
+          mode: slider
+
+    # === BEDTIME SCHEDULE ===
+    bedtime_start:
+      name: Bedtime Start
+      description: >
+        When should the sleep lights turn on? This is typically bedtime.
+        The light will turn on with your sleep color (red/amber) at this time.
+        Example: 7:00 PM for toddlers, 8:00 PM for older children.
+      default: "19:00:00"
+      selector:
+        time:
+
+    # === PER-DAY WAKE-UP TIMES ===
+    monday_wakeup:
+      name: Monday Wake-Up Time
+      description: >
+        Wake-up time for Monday. Set to when you want your child to be allowed out of bed.
+        TIP: Start 15 minutes later than their natural wake time, then gradually move earlier.
+      default: "07:00:00"
+      selector:
+        time:
+
+    tuesday_wakeup:
+      name: Tuesday Wake-Up Time
+      description: Wake-up time for Tuesday.
+      default: "07:00:00"
+      selector:
+        time:
+
+    wednesday_wakeup:
+      name: Wednesday Wake-Up Time
+      description: Wake-up time for Wednesday.
+      default: "07:00:00"
+      selector:
+        time:
+
+    thursday_wakeup:
+      name: Thursday Wake-Up Time
+      description: Wake-up time for Thursday.
+      default: "07:00:00"
+      selector:
+        time:
+
+    friday_wakeup:
+      name: Friday Wake-Up Time
+      description: Wake-up time for Friday.
+      default: "07:00:00"
+      selector:
+        time:
+
+    saturday_wakeup:
+      name: Saturday Wake-Up Time
+      description: >
+        Wake-up time for Saturday. Weekends often have later wake-up times.
+        Children appreciate consistency, but a slightly later weekend time is reasonable.
+      default: "08:00:00"
+      selector:
+        time:
+
+    sunday_wakeup:
+      name: Sunday Wake-Up Time
+      description: Wake-up time for Sunday.
+      default: "08:00:00"
+      selector:
+        time:
+
+    # === WAKE-UP PERIOD DURATION ===
+    wakeup_duration:
+      name: Wake-Up Light Duration
+      description: >
+        How long should the wake-up color stay on after wake-up time? The light will
+        automatically turn off after this duration. Set this to cover the time until
+        your child typically leaves the room.
+
+        Example: If wake-up is 7:00 AM and you typically get your child at 7:30 AM,
+        set this to 45-60 minutes.
+      default: 60
+      selector:
+        number:
+          min: 15
+          max: 180
+          step: 15
+          unit_of_measurement: minutes
+          mode: slider
+
+    # === MOTION SENSOR SETTINGS ===
+    motion_sensor:
+      name: Motion Sensor (Optional)
+      description: >
+        Optional: Select a motion sensor to trigger a temporary brightness boost during
+        sleep time. When motion is detected, lights briefly increase in brightness
+        (helpful for parent check-ins or bathroom trips), then return to sleep brightness.
+
+        During wake-up time, motion has no effect (lights stay at wake-up settings).
+        Leave empty to disable motion-based brightness boost.
+      default: {}
+      selector:
+        entity:
+          filter:
+            - domain: binary_sensor
+              device_class: motion
+
+    motion_brightness_boost:
+      name: Motion Brightness Boost
+      description: >
+        How bright should the light become when motion is detected during sleep time?
+        This is the TOTAL brightness, not added to base. Recommended: 8-15% to provide
+        visibility without being overly bright. The sleep color is maintained to avoid
+        disrupting the child's sleep.
+      default: 10
+      selector:
+        number:
+          min: 5
+          max: 30
+          step: 1
+          unit_of_measurement: "%"
+          mode: slider
+
+    motion_boost_duration:
+      name: Motion Boost Duration
+      description: >
+        How long should the brightness stay boosted after motion stops? After this
+        duration, lights return to sleep brightness. Recommended: 30-120 seconds.
+      default: 60
+      selector:
+        number:
+          min: 15
+          max: 300
+          step: 15
+          unit_of_measurement: seconds
+          mode: slider
+
+    # === TRANSITION SETTINGS ===
+    standard_transition:
+      name: Standard Transition Duration
+      description: >
+        How smoothly should lights fade for normal changes (bedtime on, motion boost,
+        turn off)? Longer transitions are gentler and less likely to startle sleeping
+        children. This does NOT affect the wake-up transition (configured separately).
+      default: 4
+      selector:
+        number:
+          min: 1
+          max: 10
+          step: 1
+          unit_of_measurement: seconds
+          mode: slider
+
+# ============================================================================
+# MODE: QUEUED
+# ============================================================================
+# Using queued mode for reliable operation:
+# - If motion boost is running when wake-up time arrives, wake-up runs after
+# - Prevents restart mode issues (motion cancelling wake-up auto-off sequence)
+# - Ensures all time-based triggers are processed in order
+# - Max queue of 3 handles edge cases without memory issues
+#
+# NOTE: We considered other modes:
+# - restart: Would cancel wake-up auto-off if motion detected during delay
+# - single: Would drop wake-up trigger if motion boost running at that time
+# - parallel: Could cause conflicting light states from concurrent runs
+mode: queued
+max: 3
+max_exceeded: silent
+
+# ============================================================================
+# TRIGGER VARIABLES
+# ============================================================================
+# These are calculated at trigger time and available in trigger conditions
+trigger_variables:
+  # Input references for trigger-time calculations
+  tv_monday_wakeup: !input monday_wakeup
+  tv_tuesday_wakeup: !input tuesday_wakeup
+  tv_wednesday_wakeup: !input wednesday_wakeup
+  tv_thursday_wakeup: !input thursday_wakeup
+  tv_friday_wakeup: !input friday_wakeup
+  tv_saturday_wakeup: !input saturday_wakeup
+  tv_sunday_wakeup: !input sunday_wakeup
+  tv_warning_enabled: !input warning_enabled
+  tv_warning_minutes: !input warning_minutes_before
+
+# ============================================================================
+# VARIABLES
+# ============================================================================
+variables:
+  # === INPUT REFERENCES ===
+  motion_entity: !input motion_sensor
+  sleep_brightness_pct: !input sleep_brightness
+  wakeup_brightness_pct: !input wakeup_brightness
+  motion_brightness_pct: !input motion_brightness_boost
+  motion_duration: !input motion_boost_duration
+  transition_time: !input standard_transition
+  wakeup_transition_time: !input wakeup_transition
+  wakeup_light_duration: !input wakeup_duration
+  warning_is_enabled: !input warning_enabled
+  warning_minutes: !input warning_minutes_before
+
+  # === COLOR VALUES ===
+  # Direct RGB arrays from selectors
+  sleep_rgb: !input sleep_color
+  wakeup_rgb: !input wakeup_color
+  warning_rgb: !input warning_color
+
+  # === PER-DAY WAKE-UP TIMES ===
+  monday_wake: !input monday_wakeup
+  tuesday_wake: !input tuesday_wakeup
+  wednesday_wake: !input wednesday_wakeup
+  thursday_wake: !input thursday_wakeup
+  friday_wake: !input friday_wakeup
+  saturday_wake: !input saturday_wakeup
+  sunday_wake: !input sunday_wakeup
+
+  # === CALCULATED: TODAY'S WAKE-UP TIME ===
+  # Get the wake-up time for the current day of week (0=Monday, 6=Sunday)
+  todays_wakeup_time: >
+    {% set day = now().weekday() %}
+    {% if day == 0 %}{{ monday_wake }}
+    {% elif day == 1 %}{{ tuesday_wake }}
+    {% elif day == 2 %}{{ wednesday_wake }}
+    {% elif day == 3 %}{{ thursday_wake }}
+    {% elif day == 4 %}{{ friday_wake }}
+    {% elif day == 5 %}{{ saturday_wake }}
+    {% else %}{{ sunday_wake }}
+    {% endif %}
+
+  # === CALCULATED: WARNING TIME (if enabled) ===
+  # Calculate warning time as wake-up minus warning_minutes
+  todays_warning_time: >
+    {% if warning_is_enabled %}
+      {% set wake_parts = todays_wakeup_time.split(':') %}
+      {% set wake_hour = wake_parts[0] | int %}
+      {% set wake_min = wake_parts[1] | int %}
+      {% set total_min = wake_hour * 60 + wake_min - warning_minutes %}
+      {% if total_min < 0 %}{% set total_min = total_min + 1440 %}{% endif %}
+      {% set warn_hour = (total_min // 60) | int %}
+      {% set warn_min = (total_min % 60) | int %}
+      {{ '%02d:%02d:00' | format(warn_hour, warn_min) }}
+    {% else %}
+      {{ todays_wakeup_time }}
+    {% endif %}
+
+  # === TIME STATE CALCULATIONS ===
+  bedtime_start_time: !input bedtime_start
+
+  # Calculate current time in seconds since midnight
+  current_time_seconds: >
+    {{ now().hour * 3600 + now().minute * 60 + now().second }}
+
+  # Convert bedtime to seconds
+  bedtime_seconds: >
+    {% set parts = bedtime_start_time.split(':') %}
+    {{ parts[0] | int * 3600 + parts[1] | int * 60 }}
+
+  # Convert today's wake-up to seconds
+  wakeup_seconds: >
+    {% set parts = todays_wakeup_time.split(':') %}
+    {{ parts[0] | int * 3600 + parts[1] | int * 60 }}
+
+  # Convert warning time to seconds
+  warning_seconds: >
+    {% set parts = todays_warning_time.split(':') %}
+    {{ parts[0] | int * 3600 + parts[1] | int * 60 }}
+
+  # === STATE FLAGS ===
+  # Determine if we're in sleep period (bedtime to wake-up, handles midnight wraparound)
+  is_sleep_time: >
+    {% set current = current_time_seconds | int %}
+    {% set bedtime = bedtime_seconds | int %}
+    {% set wakeup = wakeup_seconds | int %}
+    {% if bedtime > wakeup %}
+      {{ current >= bedtime or current < wakeup }}
+    {% else %}
+      {{ current >= bedtime and current < wakeup }}
+    {% endif %}
+
+  # Determine if we're in warning period (warning_time to wake-up)
+  is_warning_time: >
+    {% set current = current_time_seconds | int %}
+    {% set warning = warning_seconds | int %}
+    {% set wakeup = wakeup_seconds | int %}
+    {% if warning_is_enabled %}
+      {% if warning > wakeup %}
+        {{ current >= warning or current < wakeup }}
+      {% else %}
+        {{ current >= warning and current < wakeup }}
+      {% endif %}
+    {% else %}
+      false
+    {% endif %}
+
+  # Check if motion sensor is configured
+  motion_sensor_enabled: >
+    {{ motion_entity not in [none, '', 'unavailable', 'unknown'] and motion_entity | length > 0 }}
+
+# ============================================================================
+# TRIGGERS
+# ============================================================================
+trigger:
+  # --- TRIGGER 1: Bedtime start (turn on sleep lights) ---
+  - platform: time
+    at: !input bedtime_start
+    id: bedtime_start
+
+  # --- TRIGGER 2: Wake-up time (dynamic per-day) ---
+  # We use template triggers to handle per-day wake-up times
+  # Monday
+  - platform: time
+    at: !input monday_wakeup
+    id: wakeup_time
+  # Tuesday
+  - platform: time
+    at: !input tuesday_wakeup
+    id: wakeup_time
+  # Wednesday
+  - platform: time
+    at: !input wednesday_wakeup
+    id: wakeup_time
+  # Thursday
+  - platform: time
+    at: !input thursday_wakeup
+    id: wakeup_time
+  # Friday
+  - platform: time
+    at: !input friday_wakeup
+    id: wakeup_time
+  # Saturday
+  - platform: time
+    at: !input saturday_wakeup
+    id: wakeup_time
+  # Sunday
+  - platform: time
+    at: !input sunday_wakeup
+    id: wakeup_time
+
+  # --- TRIGGER 3: Warning time (dynamic, calculated per-day) ---
+  # Template trigger that fires when we enter the warning period.
+  # Uses a 59-second window to ensure we catch the transition reliably.
+  # The trigger fires when current time is within the first minute of warning period.
+  - platform: template
+    value_template: >
+      {% set day = now().weekday() %}
+      {% if day == 0 %}
+        {% set wake = tv_monday_wakeup %}
+      {% elif day == 1 %}
+        {% set wake = tv_tuesday_wakeup %}
+      {% elif day == 2 %}
+        {% set wake = tv_wednesday_wakeup %}
+      {% elif day == 3 %}
+        {% set wake = tv_thursday_wakeup %}
+      {% elif day == 4 %}
+        {% set wake = tv_friday_wakeup %}
+      {% elif day == 5 %}
+        {% set wake = tv_saturday_wakeup %}
+      {% else %}
+        {% set wake = tv_sunday_wakeup %}
+      {% endif %}
+      {% set wake_parts = wake.split(':') %}
+      {% set wake_sec = wake_parts[0] | int * 3600 + wake_parts[1] | int * 60 %}
+      {% set warn_sec = wake_sec - (tv_warning_minutes | int * 60) %}
+      {% if warn_sec < 0 %}{% set warn_sec = warn_sec + 86400 %}{% endif %}
+      {% set current_sec = now().hour * 3600 + now().minute * 60 + now().second %}
+      {{ tv_warning_enabled and current_sec >= warn_sec and current_sec < (warn_sec + 59) }}
+    id: warning_time
+
+  # --- TRIGGER 4: Motion detected (for brightness boost during sleep) ---
+  - platform: state
+    entity_id: !input motion_sensor
+    to: "on"
+    id: motion_detected
+
+condition: []
+
+# ============================================================================
+# ACTIONS
+# ============================================================================
+action:
+  - choose:
+      # =====================================================================
+      # BRANCH 1: BEDTIME START - Turn on sleep lights
+      # =====================================================================
+      - conditions:
+          - condition: trigger
+            id: bedtime_start
+        sequence:
+          # Turn on lights with sleep color (warm red/amber) at low brightness
+          - service: light.turn_on
+            target: !input target_lights
+            data:
+              brightness_pct: "{{ sleep_brightness_pct }}"
+              rgb_color: "{{ sleep_rgb }}"
+              transition: "{{ transition_time }}"
+
+      # =====================================================================
+      # BRANCH 2: WARNING TIME - Change to "almost time" color
+      # =====================================================================
+      - conditions:
+          - condition: trigger
+            id: warning_time
+          - condition: template
+            value_template: "{{ warning_is_enabled }}"
+        sequence:
+          # Transition to warning color (yellow/orange)
+          # Use standard transition - this is just a color change, not the main wake-up
+          - service: light.turn_on
+            target: !input target_lights
+            data:
+              brightness_pct: "{{ sleep_brightness_pct }}"
+              rgb_color: "{{ warning_rgb }}"
+              transition: "{{ transition_time }}"
+
+      # =====================================================================
+      # BRANCH 3: WAKE-UP TIME - Gradual transition to wake-up color
+      # =====================================================================
+      - conditions:
+          - condition: trigger
+            id: wakeup_time
+          # Only run if today matches the trigger day
+          # (prevents Monday's trigger running on Tuesday if times differ)
+          - condition: template
+            value_template: >
+              {% set day = now().weekday() %}
+              {% set current_time = '%02d:%02d' | format(now().hour, now().minute) %}
+              {% if day == 0 %}{% set expected = monday_wake %}
+              {% elif day == 1 %}{% set expected = tuesday_wake %}
+              {% elif day == 2 %}{% set expected = wednesday_wake %}
+              {% elif day == 3 %}{% set expected = thursday_wake %}
+              {% elif day == 4 %}{% set expected = friday_wake %}
+              {% elif day == 5 %}{% set expected = saturday_wake %}
+              {% else %}{% set expected = sunday_wake %}{% endif %}
+              {% set expected_parts = expected.split(':') %}
+              {% set expected_hm = '%02d:%02d' | format(expected_parts[0]|int, expected_parts[1]|int) %}
+              {{ current_time == expected_hm }}
+        sequence:
+          # Gradual fade from current color to wake-up color
+          # The transition_time here is the special wake-up transition (longer)
+          - service: light.turn_on
+            target: !input target_lights
+            data:
+              brightness_pct: "{{ wakeup_brightness_pct }}"
+              rgb_color: "{{ wakeup_rgb }}"
+              transition: "{{ wakeup_transition_time }}"
+
+          # Wait for the wake-up duration, then turn off
+          - delay:
+              minutes: "{{ wakeup_light_duration }}"
+
+          # Gently turn off the lights
+          - service: light.turn_off
+            target: !input target_lights
+            data:
+              transition: "{{ transition_time * 2 }}"
+
+      # =====================================================================
+      # BRANCH 4: MOTION DETECTED - Brightness boost during sleep time only
+      # =====================================================================
+      - conditions:
+          - condition: trigger
+            id: motion_detected
+          - condition: template
+            value_template: "{{ motion_sensor_enabled }}"
+          # Only boost during sleep time (not during wake-up period)
+          - condition: template
+            value_template: "{{ is_sleep_time and not is_warning_time }}"
+        sequence:
+          # Boost brightness while maintaining sleep color
+          - service: light.turn_on
+            target: !input target_lights
+            data:
+              brightness_pct: "{{ motion_brightness_pct }}"
+              rgb_color: "{{ sleep_rgb }}"
+              transition: "{{ transition_time }}"
+
+          # Wait for motion to clear
+          - wait_for_trigger:
+              - platform: state
+                entity_id: !input motion_sensor
+                to: "off"
+                for:
+                  seconds: "{{ motion_duration }}"
+            timeout:
+              hours: 2
+            continue_on_timeout: false
+
+          # Recalculate state in case we've crossed into warning or wake-up time
+          - variables:
+              loop_current_seconds: >
+                {{ now().hour * 3600 + now().minute * 60 + now().second }}
+              loop_is_warning: >
+                {% set current = loop_current_seconds | int %}
+                {% set warning = warning_seconds | int %}
+                {% set wakeup = wakeup_seconds | int %}
+                {% if warning_is_enabled %}
+                  {% if warning > wakeup %}
+                    {{ current >= warning or current < wakeup }}
+                  {% else %}
+                    {{ current >= warning and current < wakeup }}
+                  {% endif %}
+                {% else %}
+                  false
+                {% endif %}
+              loop_is_sleep: >
+                {% set current = loop_current_seconds | int %}
+                {% set bedtime = bedtime_seconds | int %}
+                {% set wakeup = wakeup_seconds | int %}
+                {% if bedtime > wakeup %}
+                  {{ current >= bedtime or current < wakeup }}
+                {% else %}
+                  {{ current >= bedtime and current < wakeup }}
+                {% endif %}
+
+          # Return to appropriate state based on current time
+          - choose:
+              # If we're now in warning time, set warning color
+              - conditions:
+                  - condition: template
+                    value_template: "{{ loop_is_warning }}"
+                sequence:
+                  - service: light.turn_on
+                    target: !input target_lights
+                    data:
+                      brightness_pct: "{{ sleep_brightness_pct }}"
+                      rgb_color: "{{ warning_rgb }}"
+                      transition: "{{ transition_time }}"
+
+              # If still in sleep time, return to sleep color
+              - conditions:
+                  - condition: template
+                    value_template: "{{ loop_is_sleep and not loop_is_warning }}"
+                sequence:
+                  - service: light.turn_on
+                    target: !input target_lights
+                    data:
+                      brightness_pct: "{{ sleep_brightness_pct }}"
+                      rgb_color: "{{ sleep_rgb }}"
+                      transition: "{{ transition_time }}"
+
+            # Default: We've crossed into wake-up time, do nothing
+            # (wake-up trigger will have already fired or will fire shortly)
+            default: []
+
+    # Default action: Do nothing (safety fallback)
+    default: []
