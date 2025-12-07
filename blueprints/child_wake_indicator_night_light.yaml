@@ -1,5 +1,5 @@
 blueprint:
-  name: "Child Wake-Up Indicator Night Light (v1.0)"
+  name: "Child Wake-Up Indicator Night Light (v1.1)"
   description: >
     A scientifically-backed "OK to Wake" night light automation for young children (ages 2-5).
     Based on peer-reviewed research and child development best practices, this blueprint uses
@@ -31,6 +31,9 @@ blueprint:
     - Wake-up timeout: Automatically turns off lights after wake-up period ends
 
     - Compatible with RGB lights (Third Reality, LIFX) and tunable white lights (Philips Hue)
+
+    - Manual activation support: Click "Run Actions" in Home Assistant to activate the
+      appropriate mode based on current time (sleep, warning, or wake-up)
 
 
     RESEARCH BASIS:
@@ -478,6 +481,24 @@ variables:
   motion_sensor_enabled: >
     {{ motion_entity not in [none, '', 'unavailable', 'unknown'] and motion_entity | length > 0 }}
 
+  # === CALCULATED: WAKE-UP PERIOD END TIME ===
+  # Wake-up period extends from wake-up time to wake-up time + duration
+  wakeup_end_seconds: >
+    {% set end_sec = wakeup_seconds | int + (wakeup_light_duration | int * 60) %}
+    {% if end_sec >= 86400 %}{{ end_sec - 86400 }}{% else %}{{ end_sec }}{% endif %}
+
+  # Determine if we're in wake-up period (wake-up to wake-up + duration)
+  # This is when the green "OK to get up" light should be on
+  is_wakeup_period: >
+    {% set current = current_time_seconds | int %}
+    {% set wakeup = wakeup_seconds | int %}
+    {% set end = wakeup_end_seconds | int %}
+    {% if wakeup > end %}
+      {{ current >= wakeup or current < end }}
+    {% else %}
+      {{ current >= wakeup and current < end }}
+    {% endif %}
+
 # ============================================================================
 # TRIGGERS
 # ============================================================================
@@ -724,5 +745,127 @@ action:
             # (wake-up trigger will have already fired or will fire shortly)
             default: []
 
-    # Default action: Do nothing (safety fallback)
-    default: []
+    # =====================================================================
+    # DEFAULT: MANUAL ACTIVATION via "Run Actions" button
+    # =====================================================================
+    # When "Run Actions" is clicked in the Home Assistant UI, no trigger ID
+    # is set, so none of the above branches match. This default block handles
+    # manual activation by determining the appropriate state based on current time.
+    #
+    # Priority order (highest to lowest):
+    # 1. Wake-up period (green) - wake-up time to wake-up + duration
+    # 2. Warning period (yellow) - warning time to wake-up (if enabled)
+    # 3. Sleep period (red) - bedtime to warning/wake-up
+    # 4. Outside all periods - defaults to sleep color (allows early activation)
+    default:
+      # Recalculate all time-based state flags fresh for manual trigger
+      - variables:
+          manual_current_seconds: >
+            {{ now().hour * 3600 + now().minute * 60 + now().second }}
+          manual_is_wakeup_period: >
+            {% set current = manual_current_seconds | int %}
+            {% set wakeup = wakeup_seconds | int %}
+            {% set end = wakeup_end_seconds | int %}
+            {% if wakeup > end %}
+              {{ current >= wakeup or current < end }}
+            {% else %}
+              {{ current >= wakeup and current < end }}
+            {% endif %}
+          manual_is_warning_time: >
+            {% set current = manual_current_seconds | int %}
+            {% set warning = warning_seconds | int %}
+            {% set wakeup = wakeup_seconds | int %}
+            {% if warning_is_enabled %}
+              {% if warning > wakeup %}
+                {{ current >= warning or current < wakeup }}
+              {% else %}
+                {{ current >= warning and current < wakeup }}
+              {% endif %}
+            {% else %}
+              false
+            {% endif %}
+          manual_is_sleep_time: >
+            {% set current = manual_current_seconds | int %}
+            {% set bedtime = bedtime_seconds | int %}
+            {% set wakeup = wakeup_seconds | int %}
+            {% if bedtime > wakeup %}
+              {{ current >= bedtime or current < wakeup }}
+            {% else %}
+              {{ current >= bedtime and current < wakeup }}
+            {% endif %}
+
+      - choose:
+          # --- MANUAL BRANCH 1: During wake-up period (green light) ---
+          # If we're between wake-up time and wake-up + duration
+          - conditions:
+              - condition: template
+                value_template: "{{ manual_is_wakeup_period }}"
+            sequence:
+              # Turn on wake-up color (green) at wake-up brightness
+              - service: light.turn_on
+                target: !input target_lights
+                data:
+                  brightness_pct: "{{ wakeup_brightness_pct }}"
+                  rgb_color: "{{ wakeup_rgb }}"
+                  transition: "{{ transition_time }}"
+
+              # Calculate remaining time in wake-up period
+              - variables:
+                  remaining_wakeup_minutes: >
+                    {% set current = manual_current_seconds | int %}
+                    {% set end = wakeup_end_seconds | int %}
+                    {% if end < current %}
+                      {% set remaining = (end + 86400 - current) // 60 %}
+                    {% else %}
+                      {% set remaining = (end - current) // 60 %}
+                    {% endif %}
+                    {{ remaining if remaining > 0 else 1 }}
+
+              # Wait for remaining wake-up period, then turn off
+              - delay:
+                  minutes: "{{ remaining_wakeup_minutes }}"
+
+              # Gently turn off the lights
+              - service: light.turn_off
+                target: !input target_lights
+                data:
+                  transition: "{{ transition_time * 2 }}"
+
+          # --- MANUAL BRANCH 2: During warning period (yellow light) ---
+          # If warning is enabled and we're in warning period
+          - conditions:
+              - condition: template
+                value_template: "{{ manual_is_warning_time }}"
+            sequence:
+              # Turn on warning color (yellow) at sleep brightness
+              - service: light.turn_on
+                target: !input target_lights
+                data:
+                  brightness_pct: "{{ sleep_brightness_pct }}"
+                  rgb_color: "{{ warning_rgb }}"
+                  transition: "{{ transition_time }}"
+
+          # --- MANUAL BRANCH 3: During sleep period (red light) ---
+          # If we're in normal sleep time (not warning, not wake-up)
+          - conditions:
+              - condition: template
+                value_template: "{{ manual_is_sleep_time and not manual_is_warning_time }}"
+            sequence:
+              # Turn on sleep color (red/amber) at sleep brightness
+              - service: light.turn_on
+                target: !input target_lights
+                data:
+                  brightness_pct: "{{ sleep_brightness_pct }}"
+                  rgb_color: "{{ sleep_rgb }}"
+                  transition: "{{ transition_time }}"
+
+        # --- MANUAL BRANCH 4 (default): Outside all periods ---
+        # Default to sleep color - allows parent to activate night light early
+        # (e.g., child goes to bed early, or parent wants light on before bedtime)
+        default:
+          - service: light.turn_on
+            target: !input target_lights
+            data:
+              brightness_pct: "{{ sleep_brightness_pct }}"
+              rgb_color: "{{ sleep_rgb }}"
+              transition: "{{ transition_time }}"

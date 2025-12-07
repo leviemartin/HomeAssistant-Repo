@@ -166,7 +166,7 @@ README.md                                 # Main repository documentation
 
 ### 6. Child Wake-Up Indicator Night Light (OK-to-Wake)
 - **File**: `child_wake_indicator_night_light.yaml`
-- **Version**: 1.0
+- **Version**: 1.1
 - **Color Mode**: RGB (not color_temp) for Third Reality compatibility
 - **Design Philosophy**: "Red means bed, Green means GO!" stoplight system
 - **Special Features**:
@@ -177,6 +177,7 @@ README.md                                 # Main repository documentation
   - Gradual wake-up transition (10-300 seconds configurable)
   - Motion-activated brightness boost during sleep time only
   - Wake-up auto-off after configurable duration (15-180 min)
+  - **Manual activation (v1.1)**: Click "Run Actions" to activate based on current time
 - **Mode**: `queued` (max: 3) - ensures reliable operation
   - Prevents restart mode issues (motion cancelling wake-up sequence)
   - All time-based triggers processed in order

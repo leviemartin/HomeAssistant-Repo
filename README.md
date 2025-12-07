@@ -63,7 +63,7 @@ Research-based night light automation specifically designed for young children's
 https://raw.githubusercontent.com/leviemartin/HomeAssistant-Repo/main/blueprints/child_night_light.yaml
 ```
 
-### 6. Child Wake-Up Indicator Night Light (v1.0) ⭐ NEW
+### 6. Child Wake-Up Indicator Night Light (v1.1) ⭐ NEW
 "OK to Wake" style night light that teaches children when to stay in bed vs. when it's OK to get up using colors. Based on the popular "stoplight" system recommended by pediatric sleep consultants: **Red means bed, Green means GO!**
 
 **Import URL:**
@@ -79,6 +79,7 @@ https://raw.githubusercontent.com/leviemartin/HomeAssistant-Repo/main/blueprints
 - **Gradual wake-up transition**: Smooth 10-300 second fade from sleep to wake-up color
 - **Motion brightness boost**: For parent check-ins during sleep time
 - **Wake-up auto-off**: Automatically turns off after configurable duration
+- **Manual activation (v1.1)**: Click "Run Actions" to activate based on current time
 - **Third Reality compatible**: Uses RGB colors (not color_temp)
 
 **Research Basis:**
