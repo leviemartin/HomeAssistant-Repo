@@ -1,5 +1,5 @@
 blueprint:
-  name: "Child Wake-Up Indicator Night Light (v1.1)"
+  name: "Child Wake-Up Indicator Night Light (v1.2)"
   description: >
     A scientifically-backed "OK to Wake" night light automation for young children (ages 2-5).
     Based on peer-reviewed research and child development best practices, this blueprint uses
@@ -833,6 +833,7 @@ action:
 
           # --- MANUAL BRANCH 2: During warning period (yellow light) ---
           # If warning is enabled and we're in warning period
+          # FULL CYCLE: Yellow -> wait for wake-up -> Green -> wait duration -> OFF
           - conditions:
               - condition: template
                 value_template: "{{ manual_is_warning_time }}"
@@ -845,8 +846,42 @@ action:
                   rgb_color: "{{ warning_rgb }}"
                   transition: "{{ transition_time }}"
 
+              # Calculate delay until wake-up time (handles midnight wraparound)
+              - variables:
+                  delay_until_wakeup_seconds: >
+                    {% set current = manual_current_seconds | int %}
+                    {% set wakeup = wakeup_seconds | int %}
+                    {% if wakeup <= current %}
+                      {{ wakeup + 86400 - current }}
+                    {% else %}
+                      {{ wakeup - current }}
+                    {% endif %}
+
+              # Wait until wake-up time
+              - delay:
+                  seconds: "{{ delay_until_wakeup_seconds }}"
+
+              # Transition to wake-up color (green) with gradual fade
+              - service: light.turn_on
+                target: !input target_lights
+                data:
+                  brightness_pct: "{{ wakeup_brightness_pct }}"
+                  rgb_color: "{{ wakeup_rgb }}"
+                  transition: "{{ wakeup_transition_time }}"
+
+              # Wait for wake-up duration
+              - delay:
+                  minutes: "{{ wakeup_light_duration }}"
+
+              # Gently turn off the lights
+              - service: light.turn_off
+                target: !input target_lights
+                data:
+                  transition: "{{ transition_time * 2 }}"
+
           # --- MANUAL BRANCH 3: During sleep period (red light) ---
           # If we're in normal sleep time (not warning, not wake-up)
+          # FULL CYCLE: Red -> wait for wake-up -> Green -> wait duration -> OFF
           - conditions:
               - condition: template
                 value_template: "{{ manual_is_sleep_time and not manual_is_warning_time }}"
@@ -859,9 +894,43 @@ action:
                   rgb_color: "{{ sleep_rgb }}"
                   transition: "{{ transition_time }}"
 
+              # Calculate delay until wake-up time (handles midnight wraparound)
+              - variables:
+                  delay_until_wakeup_seconds: >
+                    {% set current = manual_current_seconds | int %}
+                    {% set wakeup = wakeup_seconds | int %}
+                    {% if wakeup <= current %}
+                      {{ wakeup + 86400 - current }}
+                    {% else %}
+                      {{ wakeup - current }}
+                    {% endif %}
+
+              # Wait until wake-up time
+              - delay:
+                  seconds: "{{ delay_until_wakeup_seconds }}"
+
+              # Transition to wake-up color (green) with gradual fade
+              - service: light.turn_on
+                target: !input target_lights
+                data:
+                  brightness_pct: "{{ wakeup_brightness_pct }}"
+                  rgb_color: "{{ wakeup_rgb }}"
+                  transition: "{{ wakeup_transition_time }}"
+
+              # Wait for wake-up duration
+              - delay:
+                  minutes: "{{ wakeup_light_duration }}"
+
+              # Gently turn off the lights
+              - service: light.turn_off
+                target: !input target_lights
+                data:
+                  transition: "{{ transition_time * 2 }}"
+
         # --- MANUAL BRANCH 4 (default): Outside all periods ---
         # Default to sleep color - allows parent to activate night light early
         # (e.g., child goes to bed early, or parent wants light on before bedtime)
+        # FULL CYCLE: Red -> wait for wake-up -> Green -> wait duration -> OFF
         default:
           - service: light.turn_on
             target: !input target_lights
@@ -869,3 +938,37 @@ action:
               brightness_pct: "{{ sleep_brightness_pct }}"
               rgb_color: "{{ sleep_rgb }}"
               transition: "{{ transition_time }}"
+
+          # Calculate delay until wake-up time (handles midnight wraparound)
+          # Note: We use the top-level variables here (current_time_seconds, wakeup_seconds)
+          - variables:
+              delay_until_wakeup_seconds: >
+                {% set current = current_time_seconds | int %}
+                {% set wakeup = wakeup_seconds | int %}
+                {% if wakeup <= current %}
+                  {{ wakeup + 86400 - current }}
+                {% else %}
+                  {{ wakeup - current }}
+                {% endif %}
+
+          # Wait until wake-up time
+          - delay:
+              seconds: "{{ delay_until_wakeup_seconds }}"
+
+          # Transition to wake-up color (green) with gradual fade
+          - service: light.turn_on
+            target: !input target_lights
+            data:
+              brightness_pct: "{{ wakeup_brightness_pct }}"
+              rgb_color: "{{ wakeup_rgb }}"
+              transition: "{{ wakeup_transition_time }}"
+
+          # Wait for wake-up duration
+          - delay:
+              minutes: "{{ wakeup_light_duration }}"
+
+          # Gently turn off the lights
+          - service: light.turn_off
+            target: !input target_lights
+            data:
+              transition: "{{ transition_time * 2 }}"
