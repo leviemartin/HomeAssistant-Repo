@@ -221,9 +221,6 @@ action:
           - repeat:
               sequence:
                 - delay: { seconds: 60 }
-                - condition: state
-                  entity_id: !input presence_sensor
-                  state: "on"
 
                 # CRITICAL: Recalculate ALL dynamic variables
                 - variables:
@@ -245,6 +242,10 @@ action:
                           data:
                             brightness_pct: "{{ loop_calculated_brightness }}"
                             color_temp: "{{ loop_color_temp_mireds }}"
+              until:
+                - condition: state
+                  entity_id: !input presence_sensor
+                  state: "off"
 ```
 
 **Why This Matters:**
